@@ -1,0 +1,197 @@
+openapi: 3.0.3
+info:
+  title: Church Attendance API
+  version: 1.0.0
+  description: Manage organizations, mass schedules, attendance, and attendance reports.
+paths:
+  /healthcheck:
+    get:
+      summary: Checks PostgreSQL connectivity
+      responses:
+        '200': { description: Healthy }
+        '503': { description: Database unavailable }
+  /smoketest:
+    get:
+      summary: Checks that the HTTP service is responding
+      responses:
+        '200': { description: Service is responding }
+  /organizations:
+    get:
+      summary: List organizations
+      responses:
+        '200': { description: Organizations returned }
+    post:
+      summary: Create an organization
+      responses:
+        '201': { description: Organization created }
+  /organizations/{id}:
+    get:
+      summary: Get an organization
+      parameters: [ { $ref: '#/components/parameters/organizationId' } ]
+      responses: { '200': { description: Organization returned } }
+    patch:
+      summary: Update an organization
+      parameters: [ { $ref: '#/components/parameters/organizationId' } ]
+      responses: { '200': { description: Organization updated } }
+    delete:
+      summary: Delete an organization
+      parameters: [ { $ref: '#/components/parameters/organizationId' } ]
+      responses: { '204': { description: Organization deleted } }
+  /billing-accounts:
+    get:
+      summary: List billing accounts and their organization counts
+      responses: { '200': { description: Billing accounts returned } }
+    post:
+      summary: Create a billing account; payment collection is not performed
+      responses: { '201': { description: Billing account created } }
+  /billing-accounts/{id}:
+    get:
+      summary: Get a billing account
+      parameters: [ { $ref: '#/components/parameters/billingAccountId' } ]
+      responses: { '200': { description: Billing account returned } }
+    patch:
+      summary: Update a billing account
+      parameters: [ { $ref: '#/components/parameters/billingAccountId' } ]
+      responses: { '200': { description: Billing account updated } }
+  /billing-accounts/{id}/subscription:
+    get:
+      summary: Get the internal Stripe-ready subscription record
+      parameters: [ { $ref: '#/components/parameters/billingAccountId' } ]
+      responses: { '200': { description: Subscription returned } }
+    put:
+      summary: Create or update the internal subscription record; no Stripe request is made
+      parameters: [ { $ref: '#/components/parameters/billingAccountId' } ]
+      responses: { '200': { description: Subscription saved } }
+  /user-access:
+    get:
+      summary: List user role assignments; optionally filter by organizationId
+      responses: { '200': { description: User access returned } }
+    post:
+      summary: Assign a system-wide or organization-scoped role
+      responses: { '201': { description: User access created } }
+  /user-access/{id}:
+    patch:
+      summary: Update a user role assignment
+      parameters: [ { $ref: '#/components/parameters/userAccessId' } ]
+      responses: { '200': { description: User access updated } }
+    delete:
+      summary: Remove a user role assignment
+      parameters: [ { $ref: '#/components/parameters/userAccessId' } ]
+      responses: { '204': { description: User access removed } }
+  /roles:
+    get:
+      summary: List built-in and editable roles with their permissions
+      responses: { '200': { description: Roles returned } }
+    post:
+      summary: Create an organization-scoped role with selected permissions
+      responses: { '201': { description: Role created } }
+  /roles/{id}:
+    get:
+      summary: Get a role and its permissions
+      parameters: [ { $ref: '#/components/parameters/roleId' } ]
+      responses: { '200': { description: Role returned } }
+    patch:
+      summary: Rename an editable role or change its permissions
+      parameters: [ { $ref: '#/components/parameters/roleId' } ]
+      responses: { '200': { description: Role updated } }
+    delete:
+      summary: Delete an unassigned editable role
+      parameters: [ { $ref: '#/components/parameters/roleId' } ]
+      responses: { '204': { description: Role deleted } }
+  /organizations/{id}/mass-templates:
+    get:
+      summary: List recurring mass templates
+      parameters: [ { $ref: '#/components/parameters/organizationId' } ]
+      responses: { '200': { description: Templates returned } }
+    post:
+      summary: Create a recurring mass template
+      parameters: [ { $ref: '#/components/parameters/organizationId' } ]
+      responses: { '201': { description: Template created } }
+  /organizations/{id}/mass-names:
+    get:
+      summary: List reusable Mass names for an organization
+      parameters: [ { $ref: '#/components/parameters/organizationId' } ]
+      responses: { '200': { description: Mass names returned } }
+    post:
+      summary: Create a reusable Mass name
+      parameters: [ { $ref: '#/components/parameters/organizationId' } ]
+      responses: { '201': { description: Mass name created } }
+  /mass-names/{id}:
+    patch:
+      summary: Rename, retire, or restore a Mass name
+      parameters: [ { $ref: '#/components/parameters/organizationId' } ]
+      responses: { '200': { description: Mass name updated } }
+    delete:
+      summary: Delete an unused Mass name
+      parameters: [ { $ref: '#/components/parameters/organizationId' } ]
+      responses: { '204': { description: Mass name deleted } }
+  /organizations/{id}/special-masses:
+    get:
+      summary: List special added or cancelled masses
+      parameters: [ { $ref: '#/components/parameters/organizationId' } ]
+      responses: { '200': { description: Special masses returned } }
+    post:
+      summary: Add an annual or one-time special mass, or cancel a recurring mass for one date
+      parameters: [ { $ref: '#/components/parameters/organizationId' } ]
+      responses: { '201': { description: Special mass created } }
+  /organizations/{id}/scheduled-masses:
+    get:
+      summary: Get expected masses for a date, including special overrides
+      parameters:
+        - { $ref: '#/components/parameters/organizationId' }
+        - in: query
+          name: date
+          required: true
+          schema: { type: string, format: date }
+      responses: { '200': { description: Scheduled masses returned } }
+  /organizations/{id}/attendance:
+    get:
+      summary: List attendance records
+      parameters: [ { $ref: '#/components/parameters/organizationId' } ]
+      responses: { '200': { description: Attendance returned } }
+    post:
+      summary: Create or update attendance for a mass date and time
+      parameters: [ { $ref: '#/components/parameters/organizationId' } ]
+      responses: { '201': { description: Attendance saved } }
+  /organizations/{id}/reports/mass-attendance:
+    get:
+      summary: Get attendance averages by Mass name, including recurring and special Masses
+      parameters:
+        - { $ref: '#/components/parameters/organizationId' }
+        - { in: query, name: from, required: true, schema: { type: string, format: date } }
+        - { in: query, name: to, required: true, schema: { type: string, format: date } }
+        - { in: query, name: type, required: false, schema: { type: string, enum: [recurring, special] } }
+      responses: { '200': { description: Report returned } }
+  /organizations/{id}/reports/mass-attendance/{massNameID}:
+    get:
+      summary: List every attendance entry for one Mass name and report type
+      parameters:
+        - { $ref: '#/components/parameters/organizationId' }
+        - in: path
+          name: massNameID
+          required: true
+          schema: { type: string, format: uuid }
+        - { in: query, name: type, required: true, schema: { type: string, enum: [recurring, special] } }
+      responses: { '200': { description: Attendance entries returned } }
+components:
+  parameters:
+    organizationId:
+      in: path
+      name: id
+      required: true
+      schema: { type: string, format: uuid }
+    billingAccountId:
+      in: path
+      name: id
+      required: true
+      schema: { type: string, format: uuid }
+    userAccessId:
+      in: path
+      name: id
+      required: true
+      schema: { type: string, format: uuid }
+    roleId:
+      in: path
+      name: id
+      required: true
+      schema: { type: string, format: uuid }
