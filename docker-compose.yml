@@ -2,9 +2,9 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: church_attendance
-      POSTGRES_USER: church
-      POSTGRES_PASSWORD: church
+      POSTGRES_DB: parish_attendance
+      POSTGRES_USER: parish_app
+      POSTGRES_PASSWORD: parish
     ports:
       - "5432:5432"
     volumes:

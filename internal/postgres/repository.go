@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"churchattendancecounter/internal"
+	"parishattendance/internal"
 )
 
 type Repository struct{ db *sql.DB }

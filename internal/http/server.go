@@ -5,8 +5,8 @@ import (
 	"database/sql"
 	stdhttp "net/http"
 
-	"churchattendancecounter/internal"
-	"churchattendancecounter/internal/httpapi"
+	"parishattendance/internal"
+	"parishattendance/internal/httpapi"
 )
 
 type Server struct {

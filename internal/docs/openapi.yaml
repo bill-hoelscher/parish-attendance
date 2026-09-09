@@ -1,6 +1,6 @@
 openapi: 3.0.3
 info:
-  title: Church Attendance API
+  title: Parish Attendance API
   version: 1.0.0
   description: Manage organizations, mass schedules, attendance, and attendance reports.
 paths:

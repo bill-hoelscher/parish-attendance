@@ -10,10 +10,10 @@ import (
 	"os"
 	"time"
 
-	"churchattendancecounter/internal"
-	apphttp "churchattendancecounter/internal/http"
-	"churchattendancecounter/internal/postgres"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"parishattendance/internal"
+	apphttp "parishattendance/internal/http"
+	"parishattendance/internal/postgres"
 )
 
 func main() {
@@ -27,7 +27,7 @@ func main() {
 func run(port int) error {
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
-		databaseURL = "postgres://church:church@localhost:5432/church_attendance?sslmode=disable"
+		databaseURL = "postgres://church:church@localhost:5432/parish_attendance?sslmode=disable"
 	}
 
 	db, err := sql.Open("pgx", databaseURL)

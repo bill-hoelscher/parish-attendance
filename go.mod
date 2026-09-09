@@ -1,4 +1,4 @@
-module churchattendancecounter
+module parishattendance
 
 go 1.26.5
 

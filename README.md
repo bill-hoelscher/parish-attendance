@@ -1,6 +1,6 @@
-# Church Attendance API
+# Parish Attendance API
 
-Go REST API and PostgreSQL schema for recording church attendance by mass.
+Go REST API and PostgreSQL schema for recording parish attendance by mass.
 
 ## Run locally
 

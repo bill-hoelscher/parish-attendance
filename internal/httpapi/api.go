@@ -3,7 +3,7 @@ package httpapi
 import (
 	"net/http"
 
-	"churchattendancecounter/internal"
+	"parishattendance/internal"
 )
 
 type API struct{ repo internal.Repository }

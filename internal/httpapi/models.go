@@ -1,6 +1,6 @@
 package httpapi
 
-import "churchattendancecounter/internal"
+import "parishattendance/internal"
 
 // HTTP handlers use aliases so request and response JSON remains unchanged
 // while business concepts live in domain-specific packages.

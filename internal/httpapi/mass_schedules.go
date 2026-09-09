@@ -1,9 +1,9 @@
 package httpapi
 
 import (
-	"churchattendancecounter/internal"
 	"errors"
 	"net/http"
+	"parishattendance/internal"
 )
 
 func (a *API) templates(w http.ResponseWriter, r *http.Request) {

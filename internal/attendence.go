@@ -1,4 +1,4 @@
-// Package internal contains the church-attendance application domain.
+// Package internal contains the parish-attendance application domain.
 package internal
 
 import (
