@@ -3,6 +3,7 @@ package httpapi
 import (
 	"errors"
 	"net/http"
+	"parishattendance/internal/auth"
 )
 
 func (a *API) attendance(w http.ResponseWriter, r *http.Request) {
@@ -31,8 +32,8 @@ func (a *API) attendance(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	x.OrganizationID = org
-	if x.RecordedByUserID == "" {
-		x.RecordedByUserID = r.Header.Get("X-User-ID")
+	if principal, ok := auth.PrincipalFrom(r.Context()); ok {
+		x.RecordedByUserID = principal.Subject
 	}
 	if e := a.repo.UpsertAttendance(r.Context(), &x); e != nil {
 		fail(w, 500, e)

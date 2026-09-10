@@ -3,21 +3,23 @@ package httpapi
 import (
 	"errors"
 	"net/http"
+	"parishattendance/internal/auth"
 	"strings"
 )
 
-// Authentication is intentionally separate from authorization. Until an
-// identity provider is configured, an absent X-User-ID keeps local demo use
-// open. When the header is present, these role checks are enforced.
+// Authentication establishes the Cognito subject; these checks then enforce
+// the application's system and organization roles.
 func (a *API) requireSystemPermission(w http.ResponseWriter, r *http.Request) bool {
 	return a.requireOrganizationPermission(w, r, "", "system")
 }
 
 func (a *API) requireOrganizationPermission(w http.ResponseWriter, r *http.Request, organizationID, permission string) bool {
-	userID := r.Header.Get("X-User-ID")
-	if userID == "" {
-		return true
+	principal, ok := auth.PrincipalFrom(r.Context())
+	if !ok {
+		fail(w, http.StatusUnauthorized, errors.New("authentication required"))
+		return false
 	}
+	userID := principal.Subject
 	roles, err := a.repo.UserRoles(r.Context(), userID, organizationID)
 	if err != nil {
 		fail(w, http.StatusInternalServerError, err)

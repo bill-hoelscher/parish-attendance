@@ -3,6 +3,7 @@ package httpapi
 import (
 	"errors"
 	"net/http"
+	"parishattendance/internal/auth"
 	"strings"
 )
 
@@ -12,11 +13,12 @@ func (a *API) organizations(w http.ResponseWriter, r *http.Request) {
 			x []Organization
 			e error
 		)
-		if userID := r.Header.Get("X-User-ID"); userID != "" {
-			x, e = a.repo.ListAuthorizedOrganizations(r.Context(), userID)
-		} else {
-			x, e = a.repo.ListOrganizations(r.Context())
+		principal, ok := auth.PrincipalFrom(r.Context())
+		if !ok {
+			fail(w, http.StatusUnauthorized, errors.New("authentication required"))
+			return
 		}
+		x, e = a.repo.ListAuthorizedOrganizations(r.Context(), principal.Subject)
 		if e != nil {
 			fail(w, 500, e)
 			return

@@ -1,7 +1,52 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: Parish Attendance DynamoDB storage
 
+Parameters:
+  CognitoDomainPrefix:
+    Type: String
+    Description: Globally unique Cognito hosted-login domain prefix.
+  LocalCallbackURL:
+    Type: String
+    Default: http://localhost:8080/app/
+
 Resources:
+  ParishAttendanceUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: parish-attendance-users
+      UsernameAttributes: [email]
+      AutoVerifiedAttributes: [email]
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: true
+        InviteMessageTemplate:
+          EmailSubject: Welcome to Parish Attendance
+          EmailMessage: Your username is {username} and temporary password is {####}.
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 12
+          RequireLowercase: true
+          RequireUppercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+      MfaConfiguration: 'OFF'
+  ParishAttendanceUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref ParishAttendanceUserPool
+      ClientName: parish-attendance-web
+      GenerateSecret: false
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows: [code]
+      AllowedOAuthScopes: [openid, email, profile]
+      SupportedIdentityProviders: [COGNITO]
+      CallbackURLs: [!Ref LocalCallbackURL]
+      LogoutURLs: [!Ref LocalCallbackURL]
+      PreventUserExistenceErrors: ENABLED
+  ParishAttendanceUserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      UserPoolId: !Ref ParishAttendanceUserPool
+      Domain: !Ref CognitoDomainPrefix
   ParishAttendanceTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -71,3 +116,9 @@ Outputs:
   TableName:
     Description: DynamoDB table used by the Parish Attendance API.
     Value: !Ref ParishAttendanceTable
+  CognitoUserPoolId:
+    Value: !Ref ParishAttendanceUserPool
+  CognitoClientId:
+    Value: !Ref ParishAttendanceUserPoolClient
+  CognitoDomain:
+    Value: !Sub '${CognitoDomainPrefix}.auth.${AWS::Region}.amazoncognito.com'

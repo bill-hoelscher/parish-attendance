@@ -1,17 +1,24 @@
 package httpapi
 
 import (
+	"errors"
 	"net/http"
 
 	"parishattendance/internal"
+	"parishattendance/internal/auth"
 )
 
-type API struct{ repo internal.Repository }
+type API struct {
+	repo     internal.Repository
+	verifier *auth.Verifier
+	inviter  *auth.Inviter
+}
 
-func New(repo internal.Repository) http.Handler {
-	a := &API{repo: repo}
+func New(repo internal.Repository, verifier *auth.Verifier, inviter *auth.Inviter) http.Handler {
+	a := &API{repo: repo, verifier: verifier, inviter: inviter}
 	m := http.NewServeMux()
 	m.HandleFunc("GET /health", a.health)
+	m.HandleFunc("GET /me", a.me)
 	m.HandleFunc("GET /organizations", a.organizations)
 	m.HandleFunc("POST /organizations", a.organizations)
 	m.HandleFunc("GET /organizations/{id}", a.organization)
@@ -33,6 +40,7 @@ func New(repo internal.Repository) http.Handler {
 	m.HandleFunc("PATCH /roles/{id}", a.role)
 	m.HandleFunc("DELETE /roles/{id}", a.role)
 	m.HandleFunc("GET /organizations/{id}/mass-names", a.massNames)
+	m.HandleFunc("POST /organizations/{id}/accounts", a.organizationAccount)
 	m.HandleFunc("POST /organizations/{id}/mass-names", a.massNames)
 	m.HandleFunc("PATCH /mass-names/{id}", a.massName)
 	m.HandleFunc("DELETE /mass-names/{id}", a.massName)
@@ -52,7 +60,36 @@ func New(repo internal.Repository) http.Handler {
 	m.HandleFunc("DELETE /attendance/{id}", a.attendanceItem)
 	m.HandleFunc("GET /organizations/{id}/reports/mass-attendance", a.massReport)
 	m.HandleFunc("GET /organizations/{id}/reports/mass-attendance/{massNameID}", a.massReportEntries)
-	return withCORS(m)
+	return withCORS(a.requireAuthentication(m))
+}
+
+func (a *API) me(w http.ResponseWriter, r *http.Request) {
+	principal, ok := auth.PrincipalFrom(r.Context())
+	if !ok {
+		fail(w, http.StatusUnauthorized, errors.New("authentication required"))
+		return
+	}
+	roles, err := a.repo.UserRoles(r.Context(), principal.Subject, "")
+	if err != nil {
+		fail(w, http.StatusInternalServerError, err)
+		return
+	}
+	respond(w, http.StatusOK, map[string]any{"email": principal.Email, "roles": roles})
+}
+
+func (a *API) requireAuthentication(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/health" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		principal, err := a.verifier.Verify(r.Context(), auth.Bearer(r.Header.Get("Authorization")))
+		if err != nil {
+			fail(w, http.StatusUnauthorized, err)
+			return
+		}
+		next.ServeHTTP(w, r.WithContext(auth.WithPrincipal(r.Context(), principal)))
+	})
 }
 
 func (a *API) health(w http.ResponseWriter, r *http.Request) {
