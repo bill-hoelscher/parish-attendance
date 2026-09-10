@@ -1,43 +1,33 @@
 # Parish Attendance API
 
-Go REST API and PostgreSQL schema for recording parish attendance by mass.
+Go REST API and DynamoDB schema for recording parish attendance by mass.
 
 ## Run locally
 
+Create the DynamoDB table with the CloudFormation template in
+[`infra/dynamodb.yaml`](infra/dynamodb.yaml), then configure AWS credentials,
+an AWS Region, and the table name:
+
 ```sh
-docker compose up -d postgres
-cp .env.example .env
-set -a; source .env; set +a
+aws cloudformation deploy \
+  --template-file infra/dynamodb.yaml \
+  --stack-name parish-attendance-data \
+  --region us-east-1
+
+export AWS_REGION=us-east-1
+export DYNAMODB_TABLE=parish-attendance
 go run ./cmd/attendanceapi
 ```
 
-The PostgreSQL schema runs automatically when the local database is first created.
 The API listens on `http://localhost:8080`.
 
-## Upgrade an existing database
-
-PostgreSQL only runs the container initialization scripts when its data volume is
-created. If you already have a database, apply the billing foundation migration:
+CloudFormation creates AWS resources; DynamoDB Local does not implement
+CloudFormation. For local development, create the equivalent table with the
+AWS CLI and then add:
 
 ```sh
-psql "$DATABASE_URL" -f db/migrations/005_billing_foundation.sql
-psql "$DATABASE_URL" -f db/migrations/006_role_permissions.sql
-psql "$DATABASE_URL" -f db/migrations/007_editable_roles.sql
+export DYNAMODB_ENDPOINT=http://localhost:8000
 ```
-
-The migration attaches existing organizations to an active `Default billing
-account`, so existing attendance entry remains available. Rename that account or
-create additional accounts in **Administration → Billing accounts**. This release
-does not send requests to Stripe or collect payment details.
-
-The second migration adds System Administrator, Organization Administrator, and
-Attendance Counter role assignments. Authentication is still intentionally not
-configured: requests without `X-User-ID` retain open local-development access;
-requests carrying that header are checked against the assigned role.
-
-The third migration turns the organization-scoped roles into editable roles
-with individually assigned permissions. System Administrator remains built in
-and cannot be modified or deleted.
 
 ## Attendance workflow
 

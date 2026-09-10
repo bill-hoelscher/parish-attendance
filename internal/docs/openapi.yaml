@@ -6,7 +6,7 @@ info:
 paths:
   /healthcheck:
     get:
-      summary: Checks PostgreSQL connectivity
+      summary: Checks DynamoDB connectivity
       responses:
         '200': { description: Healthy }
         '503': { description: Database unavailable }
