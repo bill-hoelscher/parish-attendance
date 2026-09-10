@@ -19,8 +19,7 @@ export DYNAMODB_TABLE=parish-attendance
 go run ./cmd/attendanceapi
 ```
 
-The API listens on `http://localhost:8080`. The runtime no longer accepts a
-PostgreSQL connection string.
+The API listens on `http://localhost:8080`.
 
 CloudFormation creates AWS resources; DynamoDB Local does not implement
 CloudFormation. For local development, create the equivalent table with the
@@ -29,50 +28,6 @@ AWS CLI and then add:
 ```sh
 export DYNAMODB_ENDPOINT=http://localhost:8000
 ```
-
-## Import existing PostgreSQL data
-
-After creating the table, make the existing PostgreSQL database read-only and
-run the one-time importer:
-
-```sh
-export DATABASE_URL='postgres://...'
-export AWS_REGION=us-east-1
-export DYNAMODB_TABLE=parish-attendance
-go run ./cmd/migrate-postgres-to-dynamodb
-```
-
-The importer preserves record IDs and copies billing accounts, subscriptions,
-roles, access assignments, organizations, schedules, special Masses, and
-attendance. Run it again only while PostgreSQL remains the source of truth;
-the API itself uses DynamoDB exclusively.
-
-## Legacy PostgreSQL preparation
-
-These commands apply only when preparing an existing PostgreSQL database for
-the one-time DynamoDB importer. PostgreSQL is not used by the running API.
-PostgreSQL only runs container initialization scripts when its data volume is
-created. If you already have a database, apply the billing foundation migration:
-
-```sh
-psql "$DATABASE_URL" -f db/migrations/005_billing_foundation.sql
-psql "$DATABASE_URL" -f db/migrations/006_role_permissions.sql
-psql "$DATABASE_URL" -f db/migrations/007_editable_roles.sql
-```
-
-The migration attaches existing organizations to an active `Default billing
-account`, so existing attendance entry remains available. Rename that account or
-create additional accounts in **Administration → Billing accounts**. This release
-does not send requests to Stripe or collect payment details.
-
-The second migration adds System Administrator, Organization Administrator, and
-Attendance Counter role assignments. Authentication is still intentionally not
-configured: requests without `X-User-ID` retain open local-development access;
-requests carrying that header are checked against the assigned role.
-
-The third migration turns the organization-scoped roles into editable roles
-with individually assigned permissions. System Administrator remains built in
-and cannot be modified or deleted.
 
 ## Attendance workflow
 
