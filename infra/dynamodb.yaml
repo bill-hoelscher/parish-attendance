@@ -1,0 +1,73 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Parish Attendance DynamoDB storage
+
+Resources:
+  ParishAttendanceTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: parish-attendance
+      BillingMode: PROVISIONED
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
+      AttributeDefinitions:
+        - AttributeName: PartitionKey
+          AttributeType: S
+        - AttributeName: SortKey
+          AttributeType: S
+        - AttributeName: IdLookupPartitionKey
+          AttributeType: S
+        - AttributeName: IdLookupSortKey
+          AttributeType: S
+        - AttributeName: UserAccessPartitionKey
+          AttributeType: S
+        - AttributeName: UserAccessSortKey
+          AttributeType: S
+        - AttributeName: MassReportPartitionKey
+          AttributeType: S
+        - AttributeName: MassReportSortKey
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PartitionKey
+          KeyType: HASH
+        - AttributeName: SortKey
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: LookupByEntityId
+          KeySchema:
+            - AttributeName: IdLookupPartitionKey
+              KeyType: HASH
+            - AttributeName: IdLookupSortKey
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+          ProvisionedThroughput:
+            ReadCapacityUnits: 5
+            WriteCapacityUnits: 5
+        - IndexName: AccessByUser
+          KeySchema:
+            - AttributeName: UserAccessPartitionKey
+              KeyType: HASH
+            - AttributeName: UserAccessSortKey
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+          ProvisionedThroughput:
+            ReadCapacityUnits: 5
+            WriteCapacityUnits: 5
+        - IndexName: AttendanceByMassReport
+          KeySchema:
+            - AttributeName: MassReportPartitionKey
+              KeyType: HASH
+            - AttributeName: MassReportSortKey
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+          ProvisionedThroughput:
+            ReadCapacityUnits: 5
+            WriteCapacityUnits: 5
+
+Outputs:
+  TableName:
+    Description: DynamoDB table used by the Parish Attendance API.
+    Value: !Ref ParishAttendanceTable

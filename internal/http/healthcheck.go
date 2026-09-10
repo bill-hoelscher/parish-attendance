@@ -4,7 +4,7 @@ import "net/http"
 
 func (s *Server) handleHealthCheck() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if err := s.db.PingContext(r.Context()); err != nil {
+		if err := s.repo.Ping(r.Context()); err != nil {
 			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "unavailable"})
 			return
 		}

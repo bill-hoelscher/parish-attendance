@@ -1,22 +1,57 @@
 # Parish Attendance API
 
-Go REST API and PostgreSQL schema for recording parish attendance by mass.
+Go REST API and DynamoDB schema for recording parish attendance by mass.
 
 ## Run locally
 
+Create the DynamoDB table with the CloudFormation template in
+[`infra/dynamodb.yaml`](infra/dynamodb.yaml), then configure AWS credentials,
+an AWS Region, and the table name:
+
 ```sh
-docker compose up -d postgres
-cp .env.example .env
-set -a; source .env; set +a
+aws cloudformation deploy \
+  --template-file infra/dynamodb.yaml \
+  --stack-name parish-attendance-data \
+  --region us-east-1
+
+export AWS_REGION=us-east-1
+export DYNAMODB_TABLE=parish-attendance
 go run ./cmd/attendanceapi
 ```
 
-The PostgreSQL schema runs automatically when the local database is first created.
-The API listens on `http://localhost:8080`.
+The API listens on `http://localhost:8080`. The runtime no longer accepts a
+PostgreSQL connection string.
 
-## Upgrade an existing database
+CloudFormation creates AWS resources; DynamoDB Local does not implement
+CloudFormation. For local development, create the equivalent table with the
+AWS CLI and then add:
 
-PostgreSQL only runs the container initialization scripts when its data volume is
+```sh
+export DYNAMODB_ENDPOINT=http://localhost:8000
+```
+
+## Import existing PostgreSQL data
+
+After creating the table, make the existing PostgreSQL database read-only and
+run the one-time importer:
+
+```sh
+export DATABASE_URL='postgres://...'
+export AWS_REGION=us-east-1
+export DYNAMODB_TABLE=parish-attendance
+go run ./cmd/migrate-postgres-to-dynamodb
+```
+
+The importer preserves record IDs and copies billing accounts, subscriptions,
+roles, access assignments, organizations, schedules, special Masses, and
+attendance. Run it again only while PostgreSQL remains the source of truth;
+the API itself uses DynamoDB exclusively.
+
+## Legacy PostgreSQL preparation
+
+These commands apply only when preparing an existing PostgreSQL database for
+the one-time DynamoDB importer. PostgreSQL is not used by the running API.
+PostgreSQL only runs container initialization scripts when its data volume is
 created. If you already have a database, apply the billing foundation migration:
 
 ```sh

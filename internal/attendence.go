@@ -3,7 +3,6 @@ package internal
 
 import (
 	"context"
-	"database/sql"
 )
 
 type Organization struct {
@@ -157,7 +156,6 @@ type AttendanceLedgerItem struct {
 // Repository is the database port used by the application. Domain services can
 // depend on this contract instead of a particular PostgreSQL driver.
 type Repository interface {
-	DB() *sql.DB
 	Ping(ctx context.Context) error
 	ListOrganizations(ctx context.Context) ([]Organization, error)
 	ListAuthorizedOrganizations(ctx context.Context, userID string) ([]Organization, error)

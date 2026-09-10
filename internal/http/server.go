@@ -2,7 +2,6 @@
 package http
 
 import (
-	"database/sql"
 	stdhttp "net/http"
 
 	"parishattendance/internal"
@@ -10,13 +9,13 @@ import (
 )
 
 type Server struct {
-	db     *sql.DB
+	repo   internal.Repository
 	router *stdhttp.ServeMux
 	api    stdhttp.Handler
 }
 
 func NewServer(services internal.Services) *Server {
-	s := &Server{db: services.Repository.DB(), router: stdhttp.NewServeMux(), api: httpapi.New(services.Repository)}
+	s := &Server{repo: services.Repository, router: stdhttp.NewServeMux(), api: httpapi.New(services.Repository)}
 	s.routes()
 	return s
 }
