@@ -236,13 +236,7 @@ func (r *Repository) ListBillingAccounts(ctx context.Context) ([]internal.Billin
 	if e != nil {
 		return nil, e
 	}
-	for i := range x {
-		for _, o := range orgs {
-			if o.BillingAccountID != nil && *o.BillingAccountID == x[i].ID {
-				x[i].OrganizationCount++
-			}
-		}
-	}
+	setOrganizationCounts(x, orgs)
 	sort.Slice(x, func(i, j int) bool { return x[i].Name < x[j].Name })
 	return x, nil
 }
@@ -250,6 +244,7 @@ func (r *Repository) CreateBillingAccount(ctx context.Context, x *internal.Billi
 	if x.ID == "" {
 		x.ID = newID()
 	}
+	x.OrganizationCount = 0
 	return r.put(ctx, item{PartitionKey: "BILLING#" + x.ID, SortKey: "ACCOUNT", EntityType: "billing", ID: x.ID}, x)
 }
 func (r *Repository) GetBillingAccount(ctx context.Context, id string) (*internal.BillingAccount, error) {
@@ -273,7 +268,21 @@ func (r *Repository) UpdateBillingAccount(ctx context.Context, x *internal.Billi
 	if e != nil {
 		return e
 	}
+	x.OrganizationCount = 0
 	return r.put(ctx, item{PartitionKey: old.PartitionKey, SortKey: old.SortKey, EntityType: "billing", ID: x.ID}, x)
+}
+
+// OrganizationCount is derived from organization records and must never be
+// trusted from a stored billing-account payload or import source.
+func setOrganizationCounts(accounts []internal.BillingAccount, organizations []internal.Organization) {
+	for i := range accounts {
+		accounts[i].OrganizationCount = 0
+		for _, organization := range organizations {
+			if organization.BillingAccountID != nil && *organization.BillingAccountID == accounts[i].ID {
+				accounts[i].OrganizationCount++
+			}
+		}
+	}
 }
 func (r *Repository) GetSubscription(ctx context.Context, billing string) (*internal.Subscription, error) {
 	xs, e := listValue[internal.Subscription](ctx, r, "subscription", "")
