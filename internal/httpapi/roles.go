@@ -16,9 +16,6 @@ var knownPermissions = map[string]bool{
 }
 
 func (a *API) roles(w http.ResponseWriter, r *http.Request) {
-	if !a.requireSystemPermission(w, r) {
-		return
-	}
 	if r.Method == http.MethodGet {
 		roles, err := a.repo.ListRoles(r.Context())
 		if err != nil {
@@ -26,6 +23,9 @@ func (a *API) roles(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		respond(w, http.StatusOK, roles)
+		return
+	}
+	if !a.requireSystemPermission(w, r) {
 		return
 	}
 	var role Role

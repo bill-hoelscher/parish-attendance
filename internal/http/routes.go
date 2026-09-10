@@ -56,6 +56,7 @@ func (s *Server) routes() {
 	s.router.Handle("GET /docs/openapi.yaml", s.openAPI())
 	s.router.Handle("GET /docs/", s.swaggerUI())
 	s.router.Handle("GET /app/", s.webPage())
+	s.router.HandleFunc("GET /auth/config", s.authConfig)
 
 	// Retain the existing CORS preflight behavior and /health compatibility route.
 	s.router.Handle("/", s.api)
