@@ -155,12 +155,12 @@ paths:
       responses: { '201': { description: Attendance saved } }
   /parishes/{id}/reports/mass-attendance:
     get:
-      summary: Get attendance averages by Mass name, including recurring and special Masses
+      summary: Get attendance averages by Mass name for weekend, weekday, recurring, or special Masses
       parameters:
         - { $ref: '#/components/parameters/parishId' }
         - { in: query, name: from, required: true, schema: { type: string, format: date } }
         - { in: query, name: to, required: true, schema: { type: string, format: date } }
-        - { in: query, name: type, required: false, schema: { type: string, enum: [recurring, special] } }
+        - { in: query, name: type, required: false, schema: { type: string, enum: [recurring, weekend, weekday, special] } }
       responses: { '200': { description: Report returned } }
   /parishes/{id}/reports/mass-attendance/{massNameID}:
     get:
@@ -171,7 +171,7 @@ paths:
           name: massNameID
           required: true
           schema: { type: string, format: uuid }
-        - { in: query, name: type, required: true, schema: { type: string, enum: [recurring, special] } }
+        - { in: query, name: type, required: true, schema: { type: string, enum: [recurring, weekend, weekday, special] } }
       responses: { '200': { description: Attendance entries returned } }
 components:
   parameters:

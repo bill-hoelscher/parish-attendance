@@ -11,8 +11,8 @@ func (a *API) massReport(w http.ResponseWriter, r *http.Request) {
 	}
 	from, to := r.URL.Query().Get("from"), r.URL.Query().Get("to")
 	source := r.URL.Query().Get("type")
-	if source != "recurring" && source != "special" && source != "" {
-		fail(w, 400, errors.New("type must be recurring or special"))
+	if source != "recurring" && source != "weekend" && source != "weekday" && source != "special" && source != "" {
+		fail(w, 400, errors.New("type must be recurring, weekend, weekday, or special"))
 		return
 	}
 	x, e := a.repo.MassAttendanceReport(r.Context(), r.PathValue("id"), from, to, source)
@@ -28,8 +28,8 @@ func (a *API) massReportEntries(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	source := r.URL.Query().Get("type")
-	if source != "recurring" && source != "special" {
-		fail(w, 400, errors.New("type must be recurring or special"))
+	if source != "recurring" && source != "weekend" && source != "weekday" && source != "special" {
+		fail(w, 400, errors.New("type must be recurring, weekend, weekday, or special"))
 		return
 	}
 	x, e := a.repo.MassAttendanceEntries(r.Context(), r.PathValue("id"), r.PathValue("massNameID"), r.URL.Query().Get("from"), r.URL.Query().Get("to"), source)

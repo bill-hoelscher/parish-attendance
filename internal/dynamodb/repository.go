@@ -714,11 +714,7 @@ func (r *Repository) MassAttendanceReport(ctx context.Context, org, from, to, so
 	type agg struct{ n, sum, min, max int }
 	m := map[string]*agg{}
 	for _, x := range xs {
-		kind := "recurring"
-		if x.SpecialMassID != nil {
-			kind = "special"
-		}
-		if source != "" && source != kind {
+		if !reportAttendanceMatchesSource(x, source) {
 			continue
 		}
 		id := deref(x.MassNameID)
@@ -749,11 +745,7 @@ func (r *Repository) MassAttendanceEntries(ctx context.Context, org, mass, from,
 	}
 	out := []internal.MassAttendanceEntry{}
 	for _, x := range xs {
-		kind := "recurring"
-		if x.SpecialMassID != nil {
-			kind = "special"
-		}
-		if deref(x.MassNameID) == mass && kind == source {
+		if deref(x.MassNameID) == mass && reportAttendanceMatchesSource(x, source) {
 			out = append(out, internal.MassAttendanceEntry{ServiceDate: x.ServiceDate, ServiceTime: x.ServiceTime, AttendanceCount: x.AttendanceCount})
 		}
 	}
@@ -761,6 +753,24 @@ func (r *Repository) MassAttendanceEntries(ctx context.Context, org, mass, from,
 		return out[i].ServiceDate < out[j].ServiceDate || (out[i].ServiceDate == out[j].ServiceDate && out[i].ServiceTime < out[j].ServiceTime)
 	})
 	return out, nil
+}
+
+func reportAttendanceMatchesSource(x internal.Attendance, source string) bool {
+	if source == "" {
+		return true
+	}
+	if x.SpecialMassID != nil {
+		return source == "special"
+	}
+	if source == "recurring" {
+		return true
+	}
+	date, err := time.Parse("2006-01-02", x.ServiceDate)
+	if err != nil {
+		return false
+	}
+	weekend := date.Weekday() == time.Saturday || date.Weekday() == time.Sunday
+	return (source == "weekend" && weekend) || (source == "weekday" && !weekend)
 }
 
 func (r *Repository) updateOrg(ctx context.Context, entity, id, org string, value any) error {
