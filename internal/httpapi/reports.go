@@ -6,7 +6,7 @@ import (
 )
 
 func (a *API) massReport(w http.ResponseWriter, r *http.Request) {
-	if !a.requireOrganizationPermission(w, r, r.PathValue("id"), "view_reports") {
+	if !a.requireParishPermission(w, r, r.PathValue("id"), "view_reports") {
 		return
 	}
 	from, to := r.URL.Query().Get("from"), r.URL.Query().Get("to")
@@ -24,7 +24,7 @@ func (a *API) massReport(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) massReportEntries(w http.ResponseWriter, r *http.Request) {
-	if !a.requireOrganizationPermission(w, r, r.PathValue("id"), "view_reports") {
+	if !a.requireParishPermission(w, r, r.PathValue("id"), "view_reports") {
 		return
 	}
 	source := r.URL.Query().Get("type")

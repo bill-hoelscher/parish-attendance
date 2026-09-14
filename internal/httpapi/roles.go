@@ -33,7 +33,7 @@ func (a *API) roles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	role.Key = newRoleKey()
-	role.Scope = "organization"
+	role.Scope = "parish"
 	role.IsSystem = false
 	if err := validEditableRole(role); err != nil {
 		fail(w, http.StatusBadRequest, err)
@@ -100,8 +100,8 @@ func validEditableRole(role Role) error {
 	if strings.TrimSpace(role.Name) == "" {
 		return errors.New("role name is required")
 	}
-	if role.Scope != "organization" || role.IsSystem {
-		return errors.New("only organization-scoped roles can be created or edited")
+	if role.Scope != "parish" || role.IsSystem {
+		return errors.New("only parish-scoped roles can be created or edited")
 	}
 	seen := map[string]bool{}
 	for _, permission := range role.Permissions {

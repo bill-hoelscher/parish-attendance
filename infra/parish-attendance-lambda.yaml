@@ -1,0 +1,162 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Parish Attendance Lambda Function URL application
+
+Parameters:
+  Environment:
+    Type: String
+    AllowedValues: [dev, prod]
+  DeploymentBucket:
+    Type: String
+    Description: Existing S3 bucket containing the Lambda deployment zip.
+  DeploymentKey:
+    Type: String
+    Default: parish-attendance/bootstrap.zip
+  LocalCallbackURL:
+    Type: String
+    Default: http://localhost:8080/app/
+  ApplicationCallbackURL:
+    Type: String
+    Default: ''
+  EnableCloudFront:
+    Type: String
+    AllowedValues: ['true', 'false']
+    Default: 'true'
+    Description: Create the optional CloudFront distribution in front of the Lambda Function URL.
+
+Conditions:
+  HasApplicationCallbackURL: !Not [!Equals [!Ref ApplicationCallbackURL, '']]
+  UseCloudFront: !Equals [!Ref EnableCloudFront, 'true']
+
+Resources:
+  ParishAttendanceFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: ParishAttendanceDataAndInvitations
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:DeleteItem
+                  - dynamodb:DescribeTable
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                Resource:
+                  - Fn::ImportValue: !Sub 'ParishAttendance-${Environment}-TableArn'
+                  - Fn::Sub:
+                      - '${TableArn}/index/*'
+                      - TableArn:
+                          Fn::ImportValue: !Sub 'ParishAttendance-${Environment}-TableArn'
+              - Effect: Allow
+                Action:
+                  - cognito-idp:AdminCreateUser
+                  - cognito-idp:AdminDisableUser
+                  - cognito-idp:AdminGetUser
+                  - cognito-idp:ListUsers
+                Resource:
+                  Fn::ImportValue: !Sub 'ParishAttendance-${Environment}-CognitoUserPoolArn'
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: '*'
+  ParishAttendanceFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'parish-attendance-${Environment}'
+      Architectures: [arm64]
+      Runtime: provided.al2023
+      Handler: bootstrap
+      Role: !GetAtt ParishAttendanceFunctionRole.Arn
+      MemorySize: 256
+      Timeout: 15
+      Code:
+        S3Bucket: !Ref DeploymentBucket
+        S3Key: !Ref DeploymentKey
+      Environment:
+        Variables:
+          DYNAMODB_TABLE:
+            Fn::ImportValue: !Sub 'ParishAttendance-${Environment}-TableName'
+          COGNITO_REGION: !Ref AWS::Region
+          COGNITO_USER_POOL_ID:
+            Fn::ImportValue: !Sub 'ParishAttendance-${Environment}-CognitoUserPoolId'
+          COGNITO_CLIENT_ID:
+            Fn::ImportValue: !Sub 'ParishAttendance-${Environment}-CognitoClientId'
+          COGNITO_DOMAIN:
+            Fn::ImportValue: !Sub 'ParishAttendance-${Environment}-CognitoDomain'
+          COGNITO_REDIRECT_URI: !If [HasApplicationCallbackURL, !Ref ApplicationCallbackURL, !Ref LocalCallbackURL]
+          APP_ORIGIN: !If [HasApplicationCallbackURL, !Select [0, !Split ['/app/', !Ref ApplicationCallbackURL]], !Select [0, !Split ['/app/', !Ref LocalCallbackURL]]]
+  ParishAttendanceFunctionUrl:
+    Type: AWS::Lambda::Url
+    Properties:
+      TargetFunctionArn: !GetAtt ParishAttendanceFunction.Arn
+      AuthType: NONE
+      InvokeMode: RESPONSE_STREAM
+  ParishAttendanceFunctionUrlPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunctionUrl
+      FunctionName: !Ref ParishAttendanceFunction
+      FunctionUrlAuthType: NONE
+      Principal: '*'
+  ParishAttendanceFunctionInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref ParishAttendanceFunction
+      InvokedViaFunctionUrl: true
+      Principal: '*'
+  ParishAttendanceDistribution:
+    Type: AWS::CloudFront::Distribution
+    Condition: UseCloudFront
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        HttpVersion: http2
+        IPV6Enabled: true
+        PriceClass: PriceClass_100
+        Origins:
+          - Id: ParishAttendanceFunctionUrlOrigin
+            DomainName: !Select [2, !Split ['/', !GetAtt ParishAttendanceFunctionUrl.FunctionUrl]]
+            CustomOriginConfig:
+              HTTPSPort: 443
+              OriginProtocolPolicy: https-only
+              OriginSSLProtocols: [TLSv1.2]
+        DefaultCacheBehavior:
+          TargetOriginId: ParishAttendanceFunctionUrlOrigin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD, OPTIONS, PUT, PATCH, POST, DELETE]
+          CachedMethods: [GET, HEAD]
+          MinTTL: 0
+          DefaultTTL: 0
+          MaxTTL: 0
+          ForwardedValues:
+            QueryString: true
+            Headers:
+              - Authorization
+              - Content-Type
+              - Origin
+              - Access-Control-Request-Headers
+              - Access-Control-Request-Method
+            Cookies:
+              Forward: all
+
+Outputs:
+  FunctionURL:
+    Description: Public Lambda Function URL. Append app/ for the web application.
+    Value: !GetAtt ParishAttendanceFunctionUrl.FunctionUrl
+  CloudFrontURL:
+    Condition: UseCloudFront
+    Description: Public CloudFront application URL.
+    Value: !Sub 'https://${ParishAttendanceDistribution.DomainName}/app/'

@@ -10,13 +10,14 @@ import (
 )
 
 type Server struct {
-	repo   internal.Repository
-	router *stdhttp.ServeMux
-	api    stdhttp.Handler
+	repo          internal.Repository
+	router        *stdhttp.ServeMux
+	api           stdhttp.Handler
+	authenticator *auth.Authenticator
 }
 
-func NewServer(services internal.Services, verifier *auth.Verifier, inviter *auth.Inviter) *Server {
-	s := &Server{repo: services.Repository, router: stdhttp.NewServeMux(), api: httpapi.New(services.Repository, verifier, inviter)}
+func NewServer(services internal.Services, verifier *auth.Verifier, inviter *auth.Inviter, authenticator *auth.Authenticator) *Server {
+	s := &Server{repo: services.Repository, router: stdhttp.NewServeMux(), api: httpapi.New(services.Repository, verifier, inviter), authenticator: authenticator}
 	s.routes()
 	return s
 }

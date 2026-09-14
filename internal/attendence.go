@@ -5,8 +5,9 @@ import (
 	"context"
 )
 
-type Organization struct {
+type Parish struct {
 	ID               string  `json:"id"`
+	DioceseID        *string `json:"dioceseId,omitempty"`
 	BillingAccountID *string `json:"billingAccountId,omitempty"`
 	IsActive         bool    `json:"isActive"`
 	Name             string  `json:"name"`
@@ -21,13 +22,20 @@ type Organization struct {
 	Timezone         string  `json:"timezone"`
 }
 
+// Diocese is the parent grouping for parishes. Billing remains associated
+// directly with parishes, not dioceses.
+type Diocese struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
 // BillingAccount owns a Stripe-ready subscription and may cover one or more
-// organizations. No Stripe API calls are made by this application yet.
+// parishes. No Stripe API calls are made by this application yet.
 type BillingAccount struct {
-	ID                string `json:"id"`
-	Name              string `json:"name"`
-	BillingEmail      string `json:"billingEmail"`
-	OrganizationCount int    `json:"organizationCount"`
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	BillingEmail string `json:"billingEmail"`
+	ParishCount  int    `json:"parishCount"`
 }
 
 // Subscription is the application's internal subscription record. Stripe IDs
@@ -41,15 +49,15 @@ type Subscription struct {
 	AccessThrough        *string `json:"accessThrough,omitempty"`
 }
 
-type OrganizationAccess struct {
-	OrganizationID     string  `json:"organizationId"`
-	OrganizationActive bool    `json:"organizationActive"`
+type ParishAccess struct {
+	ParishID           string  `json:"parishId"`
+	ParishActive       bool    `json:"parishActive"`
 	SubscriptionStatus string  `json:"subscriptionStatus"`
 	AccessThrough      *string `json:"accessThrough,omitempty"`
 	CanWrite           bool    `json:"canWrite"`
 }
 
-// Role is organization-scoped unless IsSystem is true. Its key is immutable
+// Role is parish-scoped unless IsSystem is true. Its key is immutable
 // and supports stable user assignments when its display name changes.
 type Role struct {
 	ID              string   `json:"id"`
@@ -62,40 +70,42 @@ type Role struct {
 }
 
 // UserAccess assigns an application role. System Administrators have no
-// organization ID; all other roles are scoped to exactly one organization.
+// parish ID; all other roles are scoped to exactly one parish.
 type UserAccess struct {
-	ID             string  `json:"id"`
-	UserID         string  `json:"userId"`
-	OrganizationID *string `json:"organizationId,omitempty"`
-	RoleID         string  `json:"roleId"`
-	Role           string  `json:"role"`
-	RoleName       string  `json:"roleName"`
+	ID       string  `json:"id"`
+	UserID   string  `json:"userId"`
+	Email    string  `json:"email,omitempty"`
+	Status   string  `json:"status,omitempty"`
+	ParishID *string `json:"parishId,omitempty"`
+	RoleID   string  `json:"roleId"`
+	Role     string  `json:"role"`
+	RoleName string  `json:"roleName"`
 }
 
-// MassName is an organization-managed reporting identity shared by recurring
+// MassName is a parish-managed reporting identity shared by recurring
 // templates and one-time special Masses.
 type MassName struct {
-	ID             string `json:"id"`
-	OrganizationID string `json:"organizationId"`
-	Name           string `json:"name"`
-	IsActive       bool   `json:"isActive"`
+	ID       string `json:"id"`
+	ParishID string `json:"parishId"`
+	Name     string `json:"name"`
+	IsActive bool   `json:"isActive"`
 }
 
 type MassTemplate struct {
-	ID             string  `json:"id"`
-	OrganizationID string  `json:"organizationId"`
-	MassNameID     *string `json:"massNameId,omitempty"`
-	Name           string  `json:"name"`
-	ServiceTime    string  `json:"serviceTime"`
-	Weekday        int     `json:"weekday"`
-	ActiveFrom     *string `json:"activeFrom,omitempty"`
-	ActiveTo       *string `json:"activeTo,omitempty"`
-	IsActive       bool    `json:"isActive"`
+	ID          string  `json:"id"`
+	ParishID    string  `json:"parishId"`
+	MassNameID  *string `json:"massNameId,omitempty"`
+	Name        string  `json:"name"`
+	ServiceTime string  `json:"serviceTime"`
+	Weekday     int     `json:"weekday"`
+	ActiveFrom  *string `json:"activeFrom,omitempty"`
+	ActiveTo    *string `json:"activeTo,omitempty"`
+	IsActive    bool    `json:"isActive"`
 }
 
 type SpecialMass struct {
 	ID             string  `json:"id"`
-	OrganizationID string  `json:"organizationId"`
+	ParishID       string  `json:"parishId"`
 	Action         string  `json:"action"`
 	ServiceDate    string  `json:"serviceDate"`
 	ServiceTime    string  `json:"serviceTime"`
@@ -107,7 +117,7 @@ type SpecialMass struct {
 
 type Attendance struct {
 	ID               string  `json:"id"`
-	OrganizationID   string  `json:"organizationId"`
+	ParishID         string  `json:"parishId"`
 	ServiceDate      string  `json:"serviceDate"`
 	ServiceTime      string  `json:"serviceTime"`
 	MassName         string  `json:"massName"`
@@ -157,52 +167,57 @@ type AttendanceLedgerItem struct {
 // depend on this contract instead of a particular storage driver.
 type Repository interface {
 	Ping(ctx context.Context) error
-	ListOrganizations(ctx context.Context) ([]Organization, error)
-	ListAuthorizedOrganizations(ctx context.Context, userID string) ([]Organization, error)
-	CreateOrganization(ctx context.Context, org *Organization) error
-	GetOrganization(ctx context.Context, id string) (*Organization, error)
-	UpdateOrganization(ctx context.Context, org *Organization) error
-	DeleteOrganization(ctx context.Context, id string) error
+	ListDioceses(ctx context.Context) ([]Diocese, error)
+	CreateDiocese(ctx context.Context, diocese *Diocese) error
+	GetDiocese(ctx context.Context, id string) (*Diocese, error)
+	UpdateDiocese(ctx context.Context, diocese *Diocese) error
+	DeleteDiocese(ctx context.Context, id string) error
+	ListParishes(ctx context.Context) ([]Parish, error)
+	ListAuthorizedParishes(ctx context.Context, userID string) ([]Parish, error)
+	CreateParish(ctx context.Context, org *Parish) error
+	GetParish(ctx context.Context, id string) (*Parish, error)
+	UpdateParish(ctx context.Context, org *Parish) error
+	DeleteParish(ctx context.Context, id string) error
 	ListBillingAccounts(ctx context.Context) ([]BillingAccount, error)
 	CreateBillingAccount(ctx context.Context, account *BillingAccount) error
 	GetBillingAccount(ctx context.Context, id string) (*BillingAccount, error)
 	UpdateBillingAccount(ctx context.Context, account *BillingAccount) error
 	GetSubscription(ctx context.Context, billingAccountID string) (*Subscription, error)
 	UpsertSubscription(ctx context.Context, subscription *Subscription) error
-	OrganizationAccess(ctx context.Context, organizationID string) (*OrganizationAccess, error)
-	ResourceOrganizationID(ctx context.Context, resource, id string) (string, error)
+	ParishAccess(ctx context.Context, parishID string) (*ParishAccess, error)
+	ResourceParishID(ctx context.Context, resource, id string) (string, error)
 	ListRoles(ctx context.Context) ([]Role, error)
 	CreateRole(ctx context.Context, role *Role) error
 	GetRole(ctx context.Context, id string) (*Role, error)
 	UpdateRole(ctx context.Context, role *Role) error
 	DeleteRole(ctx context.Context, id string) error
 	RolePermissions(ctx context.Context, roleID string) ([]string, error)
-	ListUserAccess(ctx context.Context, organizationID string) ([]UserAccess, error)
+	ListUserAccess(ctx context.Context, parishID string) ([]UserAccess, error)
 	CreateUserAccess(ctx context.Context, access *UserAccess) error
 	GetUserAccess(ctx context.Context, id string) (*UserAccess, error)
 	UpdateUserAccess(ctx context.Context, access *UserAccess) error
 	DeleteUserAccess(ctx context.Context, id string) error
-	UserRoles(ctx context.Context, userID, organizationID string) ([]UserAccess, error)
-	ListMassNames(ctx context.Context, organizationID string) ([]MassName, error)
+	UserRoles(ctx context.Context, userID, parishID string) ([]UserAccess, error)
+	ListMassNames(ctx context.Context, parishID string) ([]MassName, error)
 	CreateMassName(ctx context.Context, massName *MassName) error
 	UpdateMassName(ctx context.Context, massName *MassName) error
 	DeleteMassName(ctx context.Context, id string) error
-	ListMassTemplates(ctx context.Context, organizationID string) ([]MassTemplate, error)
+	ListMassTemplates(ctx context.Context, parishID string) ([]MassTemplate, error)
 	CreateMassTemplate(ctx context.Context, template *MassTemplate) error
 	UpdateMassTemplate(ctx context.Context, template *MassTemplate) error
 	DeleteMassTemplate(ctx context.Context, id string) error
-	ListSpecialMasses(ctx context.Context, organizationID string) ([]SpecialMass, error)
+	ListSpecialMasses(ctx context.Context, parishID string) ([]SpecialMass, error)
 	CreateSpecialMass(ctx context.Context, mass *SpecialMass) error
 	UpdateSpecialMass(ctx context.Context, mass *SpecialMass) error
 	DeleteSpecialMass(ctx context.Context, id string) error
-	ScheduledMasses(ctx context.Context, organizationID, date string) ([]ScheduledMass, error)
-	ListAttendance(ctx context.Context, organizationID, from, to string) ([]Attendance, error)
-	AttendanceLedger(ctx context.Context, organizationID, from, to string) ([]AttendanceLedgerItem, error)
+	ScheduledMasses(ctx context.Context, parishID, date string) ([]ScheduledMass, error)
+	ListAttendance(ctx context.Context, parishID, from, to string) ([]Attendance, error)
+	AttendanceLedger(ctx context.Context, parishID, from, to string) ([]AttendanceLedgerItem, error)
 	UpsertAttendance(ctx context.Context, attendance *Attendance) error
 	UpdateAttendance(ctx context.Context, attendance *Attendance) error
 	DeleteAttendance(ctx context.Context, id string) error
-	MassAttendanceReport(ctx context.Context, organizationID, from, to, source string) ([]MassAttendanceReport, error)
-	MassAttendanceEntries(ctx context.Context, organizationID, massNameID, from, to, source string) ([]MassAttendanceEntry, error)
+	MassAttendanceReport(ctx context.Context, parishID, from, to, source string) ([]MassAttendanceReport, error)
+	MassAttendanceEntries(ctx context.Context, parishID, massNameID, from, to, source string) ([]MassAttendanceEntry, error)
 }
 
 type Services struct {

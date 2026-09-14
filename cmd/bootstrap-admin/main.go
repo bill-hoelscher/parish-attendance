@@ -21,12 +21,16 @@ var builtInRoles = []internal.Role{
 		ID: "role-system-administrator", Key: "system_administrator", Name: "System Administrator", Scope: "system", IsSystem: true,
 	},
 	{
-		ID: "role-organization-administrator", Key: "organization_administrator", Name: "Organization Administrator", Scope: "organization",
+		ID: "role-parish-administrator", Key: "parish_administrator", Name: "Parish Administrator", Scope: "parish",
 		Permissions: []string{"manage_users", "manage_schedules", "record_attendance", "view_reports"},
 	},
 	{
-		ID: "role-attendance-counter", Key: "attendance_counter", Name: "Attendance Counter", Scope: "organization",
+		ID: "role-attendance-counter", Key: "attendance_counter", Name: "Attendance Counter", Scope: "parish",
 		Permissions: []string{"record_attendance", "view_reports"},
+	},
+	{
+		ID: "role-viewer", Key: "viewer", Name: "Viewer", Scope: "parish",
+		Permissions: []string{"view_reports"},
 	},
 }
 
@@ -62,12 +66,12 @@ func run(ctx context.Context, email string) error {
 	if err != nil {
 		return err
 	}
-	userID, err := auth.NewInviter(cognitoidentityprovider.NewFromConfig(awsCfg), poolID).Invite(ctx, email)
+	userID, err := auth.NewInviter(cognitoidentityprovider.NewFromConfig(awsCfg), poolID).InviteOrFind(ctx, email)
 	if err != nil {
 		return err
 	}
 	role := builtInRoles[0]
-	if err := repo.CreateUserAccess(ctx, &internal.UserAccess{UserID: userID, RoleID: role.ID, Role: role.Key, RoleName: role.Name}); err != nil {
+	if err := repo.CreateUserAccess(ctx, &internal.UserAccess{UserID: userID, Email: email, RoleID: role.ID, Role: role.Key, RoleName: role.Name}); err != nil {
 		return err
 	}
 	fmt.Printf("Invited %s as the first System Administrator. Cognito sent a temporary password by email.\n", email)

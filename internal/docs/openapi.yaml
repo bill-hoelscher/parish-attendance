@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: Parish Attendance API
   version: 1.0.0
-  description: Manage organizations, mass schedules, attendance, and attendance reports.
+  description: Manage parishes, mass schedules, attendance, and attendance reports.
 paths:
   /healthcheck:
     get:
@@ -15,31 +15,31 @@ paths:
       summary: Checks that the HTTP service is responding
       responses:
         '200': { description: Service is responding }
-  /organizations:
+  /parishes:
     get:
-      summary: List organizations
+      summary: List parishes
       responses:
-        '200': { description: Organizations returned }
+        '200': { description: Parishes returned }
     post:
-      summary: Create an organization
+      summary: Create a parish
       responses:
-        '201': { description: Organization created }
-  /organizations/{id}:
+        '201': { description: Parish created }
+  /parishes/{id}:
     get:
-      summary: Get an organization
-      parameters: [ { $ref: '#/components/parameters/organizationId' } ]
-      responses: { '200': { description: Organization returned } }
+      summary: Get a parish
+      parameters: [ { $ref: '#/components/parameters/parishId' } ]
+      responses: { '200': { description: Parish returned } }
     patch:
-      summary: Update an organization
-      parameters: [ { $ref: '#/components/parameters/organizationId' } ]
-      responses: { '200': { description: Organization updated } }
+      summary: Update a parish
+      parameters: [ { $ref: '#/components/parameters/parishId' } ]
+      responses: { '200': { description: Parish updated } }
     delete:
-      summary: Delete an organization
-      parameters: [ { $ref: '#/components/parameters/organizationId' } ]
-      responses: { '204': { description: Organization deleted } }
+      summary: Delete a parish
+      parameters: [ { $ref: '#/components/parameters/parishId' } ]
+      responses: { '204': { description: Parish deleted } }
   /billing-accounts:
     get:
-      summary: List billing accounts and their organization counts
+      summary: List billing accounts and their parish counts
       responses: { '200': { description: Billing accounts returned } }
     post:
       summary: Create a billing account; payment collection is not performed
@@ -64,10 +64,10 @@ paths:
       responses: { '200': { description: Subscription saved } }
   /user-access:
     get:
-      summary: List user role assignments; optionally filter by organizationId
+      summary: List user role assignments; optionally filter by parishId
       responses: { '200': { description: User access returned } }
     post:
-      summary: Assign a system-wide or organization-scoped role
+      summary: Assign a system-wide or parish-scoped role
       responses: { '201': { description: User access created } }
   /user-access/{id}:
     patch:
@@ -83,7 +83,7 @@ paths:
       summary: List built-in and editable roles with their permissions
       responses: { '200': { description: Roles returned } }
     post:
-      summary: Create an organization-scoped role with selected permissions
+      summary: Create a parish-scoped role with selected permissions
       responses: { '201': { description: Role created } }
   /roles/{id}:
     get:
@@ -98,75 +98,75 @@ paths:
       summary: Delete an unassigned editable role
       parameters: [ { $ref: '#/components/parameters/roleId' } ]
       responses: { '204': { description: Role deleted } }
-  /organizations/{id}/mass-templates:
+  /parishes/{id}/mass-templates:
     get:
       summary: List recurring mass templates
-      parameters: [ { $ref: '#/components/parameters/organizationId' } ]
+      parameters: [ { $ref: '#/components/parameters/parishId' } ]
       responses: { '200': { description: Templates returned } }
     post:
       summary: Create a recurring mass template
-      parameters: [ { $ref: '#/components/parameters/organizationId' } ]
+      parameters: [ { $ref: '#/components/parameters/parishId' } ]
       responses: { '201': { description: Template created } }
-  /organizations/{id}/mass-names:
+  /parishes/{id}/mass-names:
     get:
-      summary: List reusable Mass names for an organization
-      parameters: [ { $ref: '#/components/parameters/organizationId' } ]
+      summary: List reusable Mass names for a parish
+      parameters: [ { $ref: '#/components/parameters/parishId' } ]
       responses: { '200': { description: Mass names returned } }
     post:
       summary: Create a reusable Mass name
-      parameters: [ { $ref: '#/components/parameters/organizationId' } ]
+      parameters: [ { $ref: '#/components/parameters/parishId' } ]
       responses: { '201': { description: Mass name created } }
   /mass-names/{id}:
     patch:
       summary: Rename, retire, or restore a Mass name
-      parameters: [ { $ref: '#/components/parameters/organizationId' } ]
+      parameters: [ { $ref: '#/components/parameters/parishId' } ]
       responses: { '200': { description: Mass name updated } }
     delete:
       summary: Delete an unused Mass name
-      parameters: [ { $ref: '#/components/parameters/organizationId' } ]
+      parameters: [ { $ref: '#/components/parameters/parishId' } ]
       responses: { '204': { description: Mass name deleted } }
-  /organizations/{id}/special-masses:
+  /parishes/{id}/special-masses:
     get:
       summary: List special added or cancelled masses
-      parameters: [ { $ref: '#/components/parameters/organizationId' } ]
+      parameters: [ { $ref: '#/components/parameters/parishId' } ]
       responses: { '200': { description: Special masses returned } }
     post:
       summary: Add an annual or one-time special mass, or cancel a recurring mass for one date
-      parameters: [ { $ref: '#/components/parameters/organizationId' } ]
+      parameters: [ { $ref: '#/components/parameters/parishId' } ]
       responses: { '201': { description: Special mass created } }
-  /organizations/{id}/scheduled-masses:
+  /parishes/{id}/scheduled-masses:
     get:
       summary: Get expected masses for a date, including special overrides
       parameters:
-        - { $ref: '#/components/parameters/organizationId' }
+        - { $ref: '#/components/parameters/parishId' }
         - in: query
           name: date
           required: true
           schema: { type: string, format: date }
       responses: { '200': { description: Scheduled masses returned } }
-  /organizations/{id}/attendance:
+  /parishes/{id}/attendance:
     get:
       summary: List attendance records
-      parameters: [ { $ref: '#/components/parameters/organizationId' } ]
+      parameters: [ { $ref: '#/components/parameters/parishId' } ]
       responses: { '200': { description: Attendance returned } }
     post:
       summary: Create or update attendance for a mass date and time
-      parameters: [ { $ref: '#/components/parameters/organizationId' } ]
+      parameters: [ { $ref: '#/components/parameters/parishId' } ]
       responses: { '201': { description: Attendance saved } }
-  /organizations/{id}/reports/mass-attendance:
+  /parishes/{id}/reports/mass-attendance:
     get:
       summary: Get attendance averages by Mass name, including recurring and special Masses
       parameters:
-        - { $ref: '#/components/parameters/organizationId' }
+        - { $ref: '#/components/parameters/parishId' }
         - { in: query, name: from, required: true, schema: { type: string, format: date } }
         - { in: query, name: to, required: true, schema: { type: string, format: date } }
         - { in: query, name: type, required: false, schema: { type: string, enum: [recurring, special] } }
       responses: { '200': { description: Report returned } }
-  /organizations/{id}/reports/mass-attendance/{massNameID}:
+  /parishes/{id}/reports/mass-attendance/{massNameID}:
     get:
       summary: List every attendance entry for one Mass name and report type
       parameters:
-        - { $ref: '#/components/parameters/organizationId' }
+        - { $ref: '#/components/parameters/parishId' }
         - in: path
           name: massNameID
           required: true
@@ -175,7 +175,7 @@ paths:
       responses: { '200': { description: Attendance entries returned } }
 components:
   parameters:
-    organizationId:
+    parishId:
       in: path
       name: id
       required: true

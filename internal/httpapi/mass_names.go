@@ -6,9 +6,9 @@ import (
 )
 
 func (a *API) massNames(w http.ResponseWriter, r *http.Request) {
-	organizationID := r.PathValue("id")
+	parishID := r.PathValue("id")
 	if r.Method == http.MethodGet {
-		x, err := a.repo.ListMassNames(r.Context(), organizationID)
+		x, err := a.repo.ListMassNames(r.Context(), parishID)
 		if err != nil {
 			fail(w, http.StatusInternalServerError, err)
 			return
@@ -16,7 +16,7 @@ func (a *API) massNames(w http.ResponseWriter, r *http.Request) {
 		respond(w, http.StatusOK, x)
 		return
 	}
-	if !a.requireWritableOrganization(w, r, organizationID, "manage_schedules") {
+	if !a.requireWritableParish(w, r, parishID, "manage_schedules") {
 		return
 	}
 	var x MassName
@@ -27,7 +27,7 @@ func (a *API) massNames(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusBadRequest, errors.New("name is required"))
 		return
 	}
-	x.OrganizationID = organizationID
+	x.ParishID = parishID
 	if e := a.repo.CreateMassName(r.Context(), &x); e != nil {
 		fail(w, http.StatusInternalServerError, e)
 		return

@@ -7,10 +7,10 @@ import (
 	"strings"
 )
 
-func (a *API) organizations(w http.ResponseWriter, r *http.Request) {
+func (a *API) parishes(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
 		var (
-			x []Organization
+			x []Parish
 			e error
 		)
 		principal, ok := auth.PrincipalFrom(r.Context())
@@ -18,7 +18,7 @@ func (a *API) organizations(w http.ResponseWriter, r *http.Request) {
 			fail(w, http.StatusUnauthorized, errors.New("authentication required"))
 			return
 		}
-		x, e = a.repo.ListAuthorizedOrganizations(r.Context(), principal.Subject)
+		x, e = a.repo.ListAuthorizedParishes(r.Context(), principal.Subject)
 		if e != nil {
 			fail(w, 500, e)
 			return
@@ -29,34 +29,40 @@ func (a *API) organizations(w http.ResponseWriter, r *http.Request) {
 	if !a.requireSystemPermission(w, r) {
 		return
 	}
-	var x Organization
+	var x Parish
 	if !decode(w, r, &x) {
 		return
 	}
 	if x.Timezone == "" {
 		x.Timezone = "America/Chicago"
 	}
-	// New organizations begin active. They may be deactivated later while
+	// New parishes begin active. They may be deactivated later while
 	// preserving all historical schedules, attendance, and reports.
 	x.IsActive = true
-	if err := validOrganization(x); err != nil {
+	if err := validParish(x); err != nil {
 		fail(w, 400, err)
 		return
 	}
-	if e := a.repo.CreateOrganization(r.Context(), &x); e != nil {
+	if x.DioceseID != nil && strings.TrimSpace(*x.DioceseID) != "" {
+		if _, err := a.repo.GetDiocese(r.Context(), *x.DioceseID); err != nil {
+			fail(w, http.StatusBadRequest, errors.New("dioceseId must reference an existing Diocese"))
+			return
+		}
+	}
+	if e := a.repo.CreateParish(r.Context(), &x); e != nil {
 		fail(w, 500, e)
 		return
 	}
 	respond(w, 201, x)
 }
-func (a *API) organization(w http.ResponseWriter, r *http.Request) {
+func (a *API) parish(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	switch r.Method {
 	case http.MethodGet:
-		if !a.requireOrganizationPermission(w, r, id, "view_reports") {
+		if !a.requireParishPermission(w, r, id, "view_reports") {
 			return
 		}
-		x, e := a.repo.GetOrganization(r.Context(), id)
+		x, e := a.repo.GetParish(r.Context(), id)
 		if notFound(w, e) {
 			return
 		}
@@ -69,19 +75,25 @@ func (a *API) organization(w http.ResponseWriter, r *http.Request) {
 		if !a.requireSystemPermission(w, r) {
 			return
 		}
-		var x Organization
+		var x Parish
 		if !decode(w, r, &x) {
 			return
 		}
 		if x.Timezone == "" {
 			x.Timezone = "America/Chicago"
 		}
-		if err := validOrganization(x); err != nil {
+		if err := validParish(x); err != nil {
 			fail(w, 400, err)
 			return
 		}
+		if x.DioceseID != nil && strings.TrimSpace(*x.DioceseID) != "" {
+			if _, err := a.repo.GetDiocese(r.Context(), *x.DioceseID); err != nil {
+				fail(w, http.StatusBadRequest, errors.New("dioceseId must reference an existing Diocese"))
+				return
+			}
+		}
 		x.ID = id
-		if e := a.repo.UpdateOrganization(r.Context(), &x); notFound(w, e) {
+		if e := a.repo.UpdateParish(r.Context(), &x); notFound(w, e) {
 			return
 		} else if e != nil {
 			fail(w, 500, e)
@@ -92,7 +104,7 @@ func (a *API) organization(w http.ResponseWriter, r *http.Request) {
 		if !a.requireSystemPermission(w, r) {
 			return
 		}
-		if e := a.repo.DeleteOrganization(r.Context(), id); notFound(w, e) {
+		if e := a.repo.DeleteParish(r.Context(), id); notFound(w, e) {
 			return
 		} else if e != nil {
 			fail(w, 500, e)
@@ -102,12 +114,12 @@ func (a *API) organization(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func validOrganization(x Organization) error {
+func validParish(x Parish) error {
 	required := []struct {
 		name  string
 		value string
 	}{
-		{"organization name", x.Name},
+		{"parish name", x.Name},
 		{"street address", x.StreetAddress},
 		{"city", x.City},
 		{"state or province", x.StateProvince},

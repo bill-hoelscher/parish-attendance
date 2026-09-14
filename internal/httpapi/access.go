@@ -5,14 +5,14 @@ import (
 	"net/http"
 )
 
-// requireWritableOrganization is the server-side authorization point for
+// requireWritableParish is the server-side authorization point for
 // schedule and attendance changes. UI controls may be disabled for clarity,
 // but callers cannot bypass this check by calling the API directly.
-func (a *API) requireWritableOrganization(w http.ResponseWriter, r *http.Request, organizationID, permission string) bool {
-	if !a.requireOrganizationPermission(w, r, organizationID, permission) {
+func (a *API) requireWritableParish(w http.ResponseWriter, r *http.Request, parishID, permission string) bool {
+	if !a.requireParishPermission(w, r, parishID, permission) {
 		return false
 	}
-	access, err := a.repo.OrganizationAccess(r.Context(), organizationID)
+	access, err := a.repo.ParishAccess(r.Context(), parishID)
 	if notFound(w, err) {
 		return false
 	}
@@ -21,14 +21,14 @@ func (a *API) requireWritableOrganization(w http.ResponseWriter, r *http.Request
 		return false
 	}
 	if !access.CanWrite {
-		fail(w, http.StatusForbidden, errors.New("organization is inactive or its subscription does not allow updates"))
+		fail(w, http.StatusForbidden, errors.New("parish is inactive or its subscription does not allow updates"))
 		return false
 	}
 	return true
 }
 
 func (a *API) requireWritableResource(w http.ResponseWriter, r *http.Request, resource, id, permission string) (string, bool) {
-	organizationID, err := a.repo.ResourceOrganizationID(r.Context(), resource, id)
+	parishID, err := a.repo.ResourceParishID(r.Context(), resource, id)
 	if notFound(w, err) {
 		return "", false
 	}
@@ -36,5 +36,5 @@ func (a *API) requireWritableResource(w http.ResponseWriter, r *http.Request, re
 		fail(w, http.StatusInternalServerError, err)
 		return "", false
 	}
-	return organizationID, a.requireWritableOrganization(w, r, organizationID, permission)
+	return parishID, a.requireWritableParish(w, r, parishID, permission)
 }

@@ -1,19 +1,30 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Parish Attendance DynamoDB storage
+Description: Parish Attendance Cognito and DynamoDB infrastructure
 
 Parameters:
+  Environment:
+    Type: String
+    AllowedValues: [dev, prod]
+    Description: Deployment environment. Each environment receives isolated resources.
   CognitoDomainPrefix:
     Type: String
     Description: Globally unique Cognito hosted-login domain prefix.
   LocalCallbackURL:
     Type: String
     Default: http://localhost:8080/app/
+  ApplicationCallbackURL:
+    Type: String
+    Default: ''
+    Description: Lambda Function URL followed by app/, added after the Lambda stack is deployed.
+
+Conditions:
+  HasApplicationCallbackURL: !Not [!Equals [!Ref ApplicationCallbackURL, '']]
 
 Resources:
   ParishAttendanceUserPool:
     Type: AWS::Cognito::UserPool
     Properties:
-      UserPoolName: parish-attendance-users
+      UserPoolName: !Sub 'parish-attendance-${Environment}-users'
       UsernameAttributes: [email]
       AutoVerifiedAttributes: [email]
       AdminCreateUserConfig:
@@ -33,14 +44,19 @@ Resources:
     Type: AWS::Cognito::UserPoolClient
     Properties:
       UserPoolId: !Ref ParishAttendanceUserPool
-      ClientName: parish-attendance-web
+      ClientName: !Sub 'parish-attendance-${Environment}-web'
       GenerateSecret: false
+      ExplicitAuthFlows: [ALLOW_USER_PASSWORD_AUTH, ALLOW_REFRESH_TOKEN_AUTH]
       AllowedOAuthFlowsUserPoolClient: true
       AllowedOAuthFlows: [code]
       AllowedOAuthScopes: [openid, email, profile]
       SupportedIdentityProviders: [COGNITO]
-      CallbackURLs: [!Ref LocalCallbackURL]
-      LogoutURLs: [!Ref LocalCallbackURL]
+      CallbackURLs:
+        - !Ref LocalCallbackURL
+        - !If [HasApplicationCallbackURL, !Ref ApplicationCallbackURL, !Ref 'AWS::NoValue']
+      LogoutURLs:
+        - !Ref LocalCallbackURL
+        - !If [HasApplicationCallbackURL, !Ref ApplicationCallbackURL, !Ref 'AWS::NoValue']
       PreventUserExistenceErrors: ENABLED
   ParishAttendanceUserPoolDomain:
     Type: AWS::Cognito::UserPoolDomain
@@ -50,11 +66,8 @@ Resources:
   ParishAttendanceTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: parish-attendance
-      BillingMode: PROVISIONED
-      ProvisionedThroughput:
-        ReadCapacityUnits: 5
-        WriteCapacityUnits: 5
+      TableName: !Sub 'parish-attendance-${Environment}'
+      BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: PartitionKey
           AttributeType: S
@@ -86,9 +99,6 @@ Resources:
               KeyType: RANGE
           Projection:
             ProjectionType: ALL
-          ProvisionedThroughput:
-            ReadCapacityUnits: 5
-            WriteCapacityUnits: 5
         - IndexName: AccessByUser
           KeySchema:
             - AttributeName: UserAccessPartitionKey
@@ -97,9 +107,6 @@ Resources:
               KeyType: RANGE
           Projection:
             ProjectionType: ALL
-          ProvisionedThroughput:
-            ReadCapacityUnits: 5
-            WriteCapacityUnits: 5
         - IndexName: AttendanceByMassReport
           KeySchema:
             - AttributeName: MassReportPartitionKey
@@ -108,17 +115,29 @@ Resources:
               KeyType: RANGE
           Projection:
             ProjectionType: ALL
-          ProvisionedThroughput:
-            ReadCapacityUnits: 5
-            WriteCapacityUnits: 5
 
 Outputs:
   TableName:
-    Description: DynamoDB table used by the Parish Attendance API.
     Value: !Ref ParishAttendanceTable
+    Export:
+      Name: !Sub 'ParishAttendance-${Environment}-TableName'
+  TableArn:
+    Value: !GetAtt ParishAttendanceTable.Arn
+    Export:
+      Name: !Sub 'ParishAttendance-${Environment}-TableArn'
   CognitoUserPoolId:
     Value: !Ref ParishAttendanceUserPool
+    Export:
+      Name: !Sub 'ParishAttendance-${Environment}-CognitoUserPoolId'
+  CognitoUserPoolArn:
+    Value: !GetAtt ParishAttendanceUserPool.Arn
+    Export:
+      Name: !Sub 'ParishAttendance-${Environment}-CognitoUserPoolArn'
   CognitoClientId:
     Value: !Ref ParishAttendanceUserPoolClient
+    Export:
+      Name: !Sub 'ParishAttendance-${Environment}-CognitoClientId'
   CognitoDomain:
     Value: !Sub '${CognitoDomainPrefix}.auth.${AWS::Region}.amazoncognito.com'
+    Export:
+      Name: !Sub 'ParishAttendance-${Environment}-CognitoDomain'

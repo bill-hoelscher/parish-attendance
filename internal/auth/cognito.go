@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math/big"
 	"net/http"
 	"strings"
@@ -139,6 +140,65 @@ type Inviter struct {
 	userPoolID string
 }
 
+// Authenticator performs the user-facing Cognito password flows. It deliberately
+// has no persistence: passwords and temporary Cognito sessions only live for the
+// duration of the HTTPS request/response exchange.
+type Authenticator struct {
+	client   *cognitoidentityprovider.Client
+	clientID string
+}
+
+type SignInResult struct {
+	AccessToken string
+	Challenge   string
+	Session     string
+}
+
+func NewAuthenticator(client *cognitoidentityprovider.Client, clientID string) *Authenticator {
+	return &Authenticator{client: client, clientID: clientID}
+}
+
+func (a *Authenticator) SignIn(ctx context.Context, email, password string) (SignInResult, error) {
+	out, err := a.client.InitiateAuth(ctx, &cognitoidentityprovider.InitiateAuthInput{
+		AuthFlow:       types.AuthFlowTypeUserPasswordAuth,
+		ClientId:       aws.String(a.clientID),
+		AuthParameters: map[string]string{"USERNAME": email, "PASSWORD": password},
+	})
+	if err != nil {
+		return SignInResult{}, err
+	}
+	result := SignInResult{Challenge: string(out.ChallengeName), Session: aws.ToString(out.Session)}
+	if out.AuthenticationResult != nil {
+		result.AccessToken = aws.ToString(out.AuthenticationResult.AccessToken)
+	}
+	return result, nil
+}
+
+func (a *Authenticator) CompleteNewPassword(ctx context.Context, email, password, session string) (SignInResult, error) {
+	out, err := a.client.RespondToAuthChallenge(ctx, &cognitoidentityprovider.RespondToAuthChallengeInput{
+		ClientId: aws.String(a.clientID), ChallengeName: types.ChallengeNameTypeNewPasswordRequired, Session: aws.String(session),
+		ChallengeResponses: map[string]string{"USERNAME": email, "NEW_PASSWORD": password},
+	})
+	if err != nil {
+		return SignInResult{}, err
+	}
+	result := SignInResult{Challenge: string(out.ChallengeName), Session: aws.ToString(out.Session)}
+	if out.AuthenticationResult != nil {
+		result.AccessToken = aws.ToString(out.AuthenticationResult.AccessToken)
+	}
+	return result, nil
+}
+
+func (a *Authenticator) RequestPasswordReset(ctx context.Context, email string) error {
+	_, err := a.client.ForgotPassword(ctx, &cognitoidentityprovider.ForgotPasswordInput{ClientId: aws.String(a.clientID), Username: aws.String(email)})
+	return err
+}
+
+func (a *Authenticator) ConfirmPasswordReset(ctx context.Context, email, code, password string) error {
+	_, err := a.client.ConfirmForgotPassword(ctx, &cognitoidentityprovider.ConfirmForgotPasswordInput{ClientId: aws.String(a.clientID), Username: aws.String(email), ConfirmationCode: aws.String(code), Password: aws.String(password)})
+	return err
+}
+
 func NewInviter(client *cognitoidentityprovider.Client, userPoolID string) *Inviter {
 	return &Inviter{client: client, userPoolID: userPoolID}
 }
@@ -153,6 +213,81 @@ func (i *Inviter) Invite(ctx context.Context, email string) (string, error) {
 		}
 	}
 	return "", errors.New("Cognito did not return a user subject")
+}
+
+// InviteOrFind creates an account when it is new, or returns the Cognito
+// subject for an existing account. Bootstrap uses this so recreating an empty
+// application database does not require deleting the administrator in Cognito.
+func (i *Inviter) InviteOrFind(ctx context.Context, email string) (string, error) {
+	userID, err := i.Invite(ctx, email)
+	if err == nil {
+		return userID, nil
+	}
+	var exists *types.UsernameExistsException
+	if !errors.As(err, &exists) {
+		return "", err
+	}
+	out, err := i.client.AdminGetUser(ctx, &cognitoidentityprovider.AdminGetUserInput{
+		UserPoolId: aws.String(i.userPoolID),
+		Username:   aws.String(email),
+	})
+	if err != nil {
+		return "", err
+	}
+	for _, attribute := range out.UserAttributes {
+		if aws.ToString(attribute.Name) == "sub" {
+			return aws.ToString(attribute.Value), nil
+		}
+	}
+	return "", errors.New("Cognito did not return a user subject")
+}
+
+// Email returns the email address for a stored Cognito subject. User access
+// records retain the subject for authorization, but administrators should not
+// need to see it in the application.
+func (i *Inviter) Email(ctx context.Context, userID string) (string, error) {
+	out, err := i.client.ListUsers(ctx, &cognitoidentityprovider.ListUsersInput{
+		UserPoolId: aws.String(i.userPoolID),
+		Filter:     aws.String(fmt.Sprintf(`sub = "%s"`, userID)),
+		Limit:      aws.Int32(1),
+	})
+	if err != nil {
+		return "", err
+	}
+	if len(out.Users) == 0 {
+		return "", errors.New("Cognito user not found")
+	}
+	for _, attribute := range out.Users[0].Attributes {
+		if aws.ToString(attribute.Name) == "email" {
+			return aws.ToString(attribute.Value), nil
+		}
+	}
+	return "", errors.New("Cognito user does not have an email address")
+}
+
+// Status reports whether a Cognito user is currently able to sign in.
+func (i *Inviter) Status(ctx context.Context, email string) (string, error) {
+	out, err := i.client.AdminGetUser(ctx, &cognitoidentityprovider.AdminGetUserInput{
+		UserPoolId: aws.String(i.userPoolID),
+		Username:   aws.String(email),
+	})
+	if err != nil {
+		return "", err
+	}
+	if !out.Enabled {
+		return "Disabled", nil
+	}
+	return "Active", nil
+}
+
+// Disable prevents a user from signing in. Their access assignment and
+// attendance history stay intact so an administrator can retain the record.
+func (i *Inviter) Disable(ctx context.Context, email string) error {
+	_, err := i.client.AdminDisableUser(ctx, &cognitoidentityprovider.AdminDisableUserInput{
+		UserPoolId: aws.String(i.userPoolID),
+		Username:   aws.String(email),
+	})
+	return err
 }
 func Bearer(header string) string {
 	const prefix = "Bearer "

@@ -9,7 +9,7 @@ import (
 func (a *API) attendance(w http.ResponseWriter, r *http.Request) {
 	org := r.PathValue("id")
 	if r.Method == http.MethodGet {
-		if !a.requireOrganizationPermission(w, r, org, "record_attendance") {
+		if !a.requireParishPermission(w, r, org, "record_attendance") {
 			return
 		}
 		x, e := a.repo.ListAttendance(r.Context(), org, r.URL.Query().Get("from"), r.URL.Query().Get("to"))
@@ -20,7 +20,7 @@ func (a *API) attendance(w http.ResponseWriter, r *http.Request) {
 		respond(w, 200, x)
 		return
 	}
-	if !a.requireWritableOrganization(w, r, org, "record_attendance") {
+	if !a.requireWritableParish(w, r, org, "record_attendance") {
 		return
 	}
 	var x Attendance
@@ -31,7 +31,7 @@ func (a *API) attendance(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, e)
 		return
 	}
-	x.OrganizationID = org
+	x.ParishID = org
 	if principal, ok := auth.PrincipalFrom(r.Context()); ok {
 		x.RecordedByUserID = principal.Subject
 	}
@@ -42,7 +42,7 @@ func (a *API) attendance(w http.ResponseWriter, r *http.Request) {
 	respond(w, 201, x)
 }
 func (a *API) attendanceLedger(w http.ResponseWriter, r *http.Request) {
-	if !a.requireOrganizationPermission(w, r, r.PathValue("id"), "record_attendance") {
+	if !a.requireParishPermission(w, r, r.PathValue("id"), "record_attendance") {
 		return
 	}
 	from, to := r.URL.Query().Get("from"), r.URL.Query().Get("to")

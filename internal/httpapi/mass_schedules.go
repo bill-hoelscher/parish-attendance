@@ -17,7 +17,7 @@ func (a *API) templates(w http.ResponseWriter, r *http.Request) {
 		respond(w, 200, x)
 		return
 	}
-	if !a.requireWritableOrganization(w, r, org, "manage_schedules") {
+	if !a.requireWritableParish(w, r, org, "manage_schedules") {
 		return
 	}
 	var x MassTemplate
@@ -28,7 +28,7 @@ func (a *API) templates(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, errors.New("massNameId, name, weekday (0=Sunday), and serviceTime are required"))
 		return
 	}
-	x.OrganizationID = org
+	x.ParishID = org
 	if e := a.repo.CreateMassTemplate(r.Context(), &x); e != nil {
 		fail(w, 500, e)
 		return
@@ -78,7 +78,7 @@ func (a *API) specialMasses(w http.ResponseWriter, r *http.Request) {
 		respond(w, 200, x)
 		return
 	}
-	if !a.requireWritableOrganization(w, r, org, "manage_schedules") {
+	if !a.requireWritableParish(w, r, org, "manage_schedules") {
 		return
 	}
 	var x SpecialMass
@@ -89,7 +89,7 @@ func (a *API) specialMasses(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, e)
 		return
 	}
-	x.OrganizationID = org
+	x.ParishID = org
 	if e := a.repo.CreateSpecialMass(r.Context(), &x); e != nil {
 		fail(w, 500, e)
 		return
@@ -147,7 +147,7 @@ func validSpecial(x SpecialMass) error {
 	return nil
 }
 func (a *API) scheduledMasses(w http.ResponseWriter, r *http.Request) {
-	if !a.requireOrganizationPermission(w, r, r.PathValue("id"), "record_attendance") {
+	if !a.requireParishPermission(w, r, r.PathValue("id"), "record_attendance") {
 		return
 	}
 	d := r.URL.Query().Get("date")

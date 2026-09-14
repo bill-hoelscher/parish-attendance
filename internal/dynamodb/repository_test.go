@@ -9,9 +9,9 @@ import (
 
 func TestOptionalIndexKeysAreOmittedForSparseIndexes(t *testing.T) {
 	attributes, err := attributevalue.MarshalMap(item{
-		PartitionKey: "ORG#one",
-		SortKey:      "ORG",
-		EntityType:   "organization",
+		PartitionKey: "PARISH#one",
+		SortKey:      "PARISH",
+		EntityType:   "parish",
 		ID:           "one",
 	})
 	if err != nil {
@@ -28,16 +28,16 @@ func TestOptionalIndexKeysAreOmittedForSparseIndexes(t *testing.T) {
 	}
 }
 
-func TestOrganizationCountIsAlwaysDerived(t *testing.T) {
+func TestParishCountIsAlwaysDerived(t *testing.T) {
 	billingAccountID := "billing-one"
-	accounts := []internal.BillingAccount{{ID: billingAccountID, OrganizationCount: 2}}
-	organizations := []internal.Organization{
+	accounts := []internal.BillingAccount{{ID: billingAccountID, ParishCount: 2}}
+	parishes := []internal.Parish{
 		{BillingAccountID: &billingAccountID},
 		{BillingAccountID: &billingAccountID},
 	}
 
-	setOrganizationCounts(accounts, organizations)
-	if accounts[0].OrganizationCount != 2 {
-		t.Fatalf("organization count = %d, want 2", accounts[0].OrganizationCount)
+	setParishCounts(accounts, parishes)
+	if accounts[0].ParishCount != 2 {
+		t.Fatalf("parish count = %d, want 2", accounts[0].ParishCount)
 	}
 }

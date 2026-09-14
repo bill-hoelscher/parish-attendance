@@ -33,7 +33,7 @@ type item struct {
 	SortKey                string `dynamodbav:"SortKey"`
 	EntityType             string `dynamodbav:"EntityType"`
 	ID                     string `dynamodbav:"EntityId"`
-	OrganizationID         string `dynamodbav:"OrganizationId"`
+	ParishID               string `dynamodbav:"ParishId"`
 	IdLookupPartitionKey   string `dynamodbav:"IdLookupPartitionKey,omitempty"`
 	IdLookupSortKey        string `dynamodbav:"IdLookupSortKey,omitempty"`
 	UserAccessPartitionKey string `dynamodbav:"UserAccessPartitionKey,omitempty"`
@@ -65,8 +65,9 @@ func (r *Repository) Ping(ctx context.Context) error {
 	return err
 }
 
-func orgPK(id string) string { return "ORG#" + id }
-func idPK(id string) string  { return "ID#" + id }
+func parishPK(id string) string  { return "PARISH#" + id }
+func diocesePK(id string) string { return "DIOCESE#" + id }
+func idPK(id string) string      { return "ID#" + id }
 
 func (r *Repository) put(ctx context.Context, x item, value any) error {
 	b, err := json.Marshal(value)
@@ -114,7 +115,7 @@ func (r *Repository) list(ctx context.Context, entity, org string) ([]item, erro
 		if filter != "" {
 			filter += " AND "
 		}
-		filter += "OrganizationId = :o"
+		filter += "ParishId = :o"
 		values[":o"] = &types.AttributeValueMemberS{Value: org}
 	}
 	var all []item
@@ -166,24 +167,54 @@ func getValue[T any](ctx context.Context, r *Repository, id string) (T, error) {
 	return decode[T](x)
 }
 
-func (r *Repository) ListOrganizations(ctx context.Context) ([]internal.Organization, error) {
-	x, e := listValue[internal.Organization](ctx, r, "organization", "")
+func (r *Repository) ListDioceses(ctx context.Context) ([]internal.Diocese, error) {
+	x, err := listValue[internal.Diocese](ctx, r, "diocese", "")
+	sort.Slice(x, func(i, j int) bool { return x[i].Name < x[j].Name })
+	return x, err
+}
+func (r *Repository) CreateDiocese(ctx context.Context, x *internal.Diocese) error {
+	if x.ID == "" {
+		x.ID = newID()
+	}
+	return r.put(ctx, item{PartitionKey: diocesePK(x.ID), SortKey: "DIOCESE", EntityType: "diocese", ID: x.ID}, x)
+}
+func (r *Repository) GetDiocese(ctx context.Context, id string) (*internal.Diocese, error) {
+	x, err := getValue[internal.Diocese](ctx, r, id)
+	return &x, err
+}
+func (r *Repository) UpdateDiocese(ctx context.Context, x *internal.Diocese) error {
+	old, err := r.byID(ctx, x.ID)
+	if err != nil {
+		return err
+	}
+	return r.put(ctx, item{PartitionKey: old.PartitionKey, SortKey: old.SortKey, EntityType: "diocese", ID: x.ID}, x)
+}
+func (r *Repository) DeleteDiocese(ctx context.Context, id string) error {
+	x, err := r.byID(ctx, id)
+	if err != nil {
+		return err
+	}
+	return r.delete(ctx, x.PartitionKey, x.SortKey)
+}
+
+func (r *Repository) ListParishes(ctx context.Context) ([]internal.Parish, error) {
+	x, e := listValue[internal.Parish](ctx, r, "parish", "")
 	sort.Slice(x, func(i, j int) bool { return x[i].Name < x[j].Name })
 	return x, e
 }
-func (r *Repository) ListAuthorizedOrganizations(ctx context.Context, user string) ([]internal.Organization, error) {
+func (r *Repository) ListAuthorizedParishes(ctx context.Context, user string) ([]internal.Parish, error) {
 	a, e := r.UserRoles(ctx, user, "")
 	if e != nil {
 		return nil, e
 	}
 	seen := map[string]bool{}
-	out := []internal.Organization{}
+	out := []internal.Parish{}
 	for _, v := range a {
 		if v.Role == "system_administrator" {
-			return r.ListOrganizations(ctx)
+			return r.ListParishes(ctx)
 		}
-		if v.OrganizationID != nil && !seen[*v.OrganizationID] {
-			o, e := r.GetOrganization(ctx, *v.OrganizationID)
+		if v.ParishID != nil && !seen[*v.ParishID] {
+			o, e := r.GetParish(ctx, *v.ParishID)
 			if e != nil {
 				return nil, e
 			}
@@ -194,24 +225,24 @@ func (r *Repository) ListAuthorizedOrganizations(ctx context.Context, user strin
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out, nil
 }
-func (r *Repository) CreateOrganization(ctx context.Context, x *internal.Organization) error {
+func (r *Repository) CreateParish(ctx context.Context, x *internal.Parish) error {
 	if x.ID == "" {
 		x.ID = newID()
 	}
-	return r.put(ctx, item{PartitionKey: orgPK(x.ID), SortKey: "ORG", EntityType: "organization", ID: x.ID, OrganizationID: x.ID}, x)
+	return r.put(ctx, item{PartitionKey: parishPK(x.ID), SortKey: "PARISH", EntityType: "parish", ID: x.ID, ParishID: x.ID}, x)
 }
-func (r *Repository) GetOrganization(ctx context.Context, id string) (*internal.Organization, error) {
-	x, e := getValue[internal.Organization](ctx, r, id)
+func (r *Repository) GetParish(ctx context.Context, id string) (*internal.Parish, error) {
+	x, e := getValue[internal.Parish](ctx, r, id)
 	return &x, e
 }
-func (r *Repository) UpdateOrganization(ctx context.Context, x *internal.Organization) error {
+func (r *Repository) UpdateParish(ctx context.Context, x *internal.Parish) error {
 	old, e := r.byID(ctx, x.ID)
 	if e != nil {
 		return e
 	}
-	return r.put(ctx, item{PartitionKey: old.PartitionKey, SortKey: old.SortKey, EntityType: "organization", ID: x.ID, OrganizationID: x.ID}, x)
+	return r.put(ctx, item{PartitionKey: old.PartitionKey, SortKey: old.SortKey, EntityType: "parish", ID: x.ID, ParishID: x.ID}, x)
 }
-func (r *Repository) DeleteOrganization(ctx context.Context, id string) error {
+func (r *Repository) DeleteParish(ctx context.Context, id string) error {
 	xs, e := r.list(ctx, "", id)
 	if e != nil {
 		return e
@@ -232,11 +263,11 @@ func (r *Repository) ListBillingAccounts(ctx context.Context) ([]internal.Billin
 	if e != nil {
 		return nil, e
 	}
-	orgs, e := r.ListOrganizations(ctx)
+	orgs, e := r.ListParishes(ctx)
 	if e != nil {
 		return nil, e
 	}
-	setOrganizationCounts(x, orgs)
+	setParishCounts(x, orgs)
 	sort.Slice(x, func(i, j int) bool { return x[i].Name < x[j].Name })
 	return x, nil
 }
@@ -244,7 +275,7 @@ func (r *Repository) CreateBillingAccount(ctx context.Context, x *internal.Billi
 	if x.ID == "" {
 		x.ID = newID()
 	}
-	x.OrganizationCount = 0
+	x.ParishCount = 0
 	return r.put(ctx, item{PartitionKey: "BILLING#" + x.ID, SortKey: "ACCOUNT", EntityType: "billing", ID: x.ID}, x)
 }
 func (r *Repository) GetBillingAccount(ctx context.Context, id string) (*internal.BillingAccount, error) {
@@ -268,18 +299,18 @@ func (r *Repository) UpdateBillingAccount(ctx context.Context, x *internal.Billi
 	if e != nil {
 		return e
 	}
-	x.OrganizationCount = 0
+	x.ParishCount = 0
 	return r.put(ctx, item{PartitionKey: old.PartitionKey, SortKey: old.SortKey, EntityType: "billing", ID: x.ID}, x)
 }
 
-// OrganizationCount is derived from organization records and must never be
+// ParishCount is derived from parish records and must never be
 // trusted from a stored billing-account payload or import source.
-func setOrganizationCounts(accounts []internal.BillingAccount, organizations []internal.Organization) {
+func setParishCounts(accounts []internal.BillingAccount, parishes []internal.Parish) {
 	for i := range accounts {
-		accounts[i].OrganizationCount = 0
-		for _, organization := range organizations {
-			if organization.BillingAccountID != nil && *organization.BillingAccountID == accounts[i].ID {
-				accounts[i].OrganizationCount++
+		accounts[i].ParishCount = 0
+		for _, parish := range parishes {
+			if parish.BillingAccountID != nil && *parish.BillingAccountID == accounts[i].ID {
+				accounts[i].ParishCount++
 			}
 		}
 	}
@@ -306,25 +337,25 @@ func (r *Repository) UpsertSubscription(ctx context.Context, x *internal.Subscri
 	}
 	return r.put(ctx, item{PartitionKey: "BILLING#" + x.BillingAccountID, SortKey: "SUBSCRIPTION", EntityType: "subscription", ID: x.ID}, x)
 }
-func (r *Repository) OrganizationAccess(ctx context.Context, id string) (*internal.OrganizationAccess, error) {
-	o, e := r.GetOrganization(ctx, id)
+func (r *Repository) ParishAccess(ctx context.Context, id string) (*internal.ParishAccess, error) {
+	o, e := r.GetParish(ctx, id)
 	if e != nil {
 		return nil, e
 	}
-	a := &internal.OrganizationAccess{OrganizationID: id, OrganizationActive: o.IsActive, SubscriptionStatus: "canceled"}
+	a := &internal.ParishAccess{ParishID: id, ParishActive: o.IsActive, SubscriptionStatus: "canceled"}
 	if o.BillingAccountID != nil {
 		if s, e := r.GetSubscription(ctx, *o.BillingAccountID); e == nil {
 			a.SubscriptionStatus = s.Status
 			a.AccessThrough = s.AccessThrough
 		}
 	}
-	a.CanWrite = a.OrganizationActive && (a.SubscriptionStatus == "active" || a.SubscriptionStatus == "trialing")
+	a.CanWrite = a.ParishActive && (a.SubscriptionStatus == "active" || a.SubscriptionStatus == "trialing")
 	if a.AccessThrough != nil && *a.AccessThrough < time.Now().UTC().Format("2006-01-02") {
 		a.CanWrite = false
 	}
 	return a, nil
 }
-func (r *Repository) ResourceOrganizationID(ctx context.Context, resource, id string) (string, error) {
+func (r *Repository) ResourceParishID(ctx context.Context, resource, id string) (string, error) {
 	x, e := r.byID(ctx, id)
 	if e != nil {
 		return "", e
@@ -332,7 +363,7 @@ func (r *Repository) ResourceOrganizationID(ctx context.Context, resource, id st
 	if x.EntityType != resource {
 		return "", sql.ErrNoRows
 	}
-	return x.OrganizationID, nil
+	return x.ParishID, nil
 }
 
 func (r *Repository) ListRoles(ctx context.Context) ([]internal.Role, error) {
@@ -396,7 +427,7 @@ func (r *Repository) ListUserAccess(ctx context.Context, org string) ([]internal
 	}
 	out := []internal.UserAccess{}
 	for _, v := range x {
-		if v.OrganizationID != nil && *v.OrganizationID == org {
+		if v.ParishID != nil && *v.ParishID == org {
 			out = append(out, v)
 		}
 	}
@@ -407,10 +438,10 @@ func (r *Repository) CreateUserAccess(ctx context.Context, x *internal.UserAcces
 		x.ID = newID()
 	}
 	sk := "SYSTEM"
-	if x.OrganizationID != nil {
-		sk = "ORG#" + *x.OrganizationID
+	if x.ParishID != nil {
+		sk = "PARISH#" + *x.ParishID
 	}
-	return r.put(ctx, item{PartitionKey: "ACCESS#" + x.ID, SortKey: sk, EntityType: "access", ID: x.ID, OrganizationID: deref(x.OrganizationID), UserAccessPartitionKey: "USER#" + x.UserID, UserAccessSortKey: sk}, x)
+	return r.put(ctx, item{PartitionKey: "ACCESS#" + x.ID, SortKey: sk, EntityType: "access", ID: x.ID, ParishID: deref(x.ParishID), UserAccessPartitionKey: "USER#" + x.UserID, UserAccessSortKey: sk}, x)
 }
 func (r *Repository) GetUserAccess(ctx context.Context, id string) (*internal.UserAccess, error) {
 	x, e := getValue[internal.UserAccess](ctx, r, id)
@@ -448,7 +479,7 @@ func (r *Repository) UserRoles(ctx context.Context, user, org string) ([]interna
 		if e != nil {
 			return nil, e
 		}
-		if org == "" || v.OrganizationID == nil || *v.OrganizationID == org {
+		if org == "" || v.ParishID == nil || *v.ParishID == org {
 			xs = append(xs, v)
 		}
 	}
@@ -462,10 +493,10 @@ func (r *Repository) CreateMassName(ctx context.Context, x *internal.MassName) e
 	if x.ID == "" {
 		x.ID = newID()
 	}
-	return r.put(ctx, item{PartitionKey: orgPK(x.OrganizationID), SortKey: "MASS#" + x.ID, EntityType: "mass_name", ID: x.ID, OrganizationID: x.OrganizationID}, x)
+	return r.put(ctx, item{PartitionKey: parishPK(x.ParishID), SortKey: "MASS#" + x.ID, EntityType: "mass_name", ID: x.ID, ParishID: x.ParishID}, x)
 }
 func (r *Repository) UpdateMassName(ctx context.Context, x *internal.MassName) error {
-	return r.updateOrg(ctx, "mass_name", x.ID, x.OrganizationID, x)
+	return r.updateOrg(ctx, "mass_name", x.ID, x.ParishID, x)
 }
 func (r *Repository) DeleteMassName(ctx context.Context, id string) error {
 	return r.deleteID(ctx, "mass_name", id)
@@ -477,10 +508,10 @@ func (r *Repository) CreateMassTemplate(ctx context.Context, x *internal.MassTem
 	if x.ID == "" {
 		x.ID = newID()
 	}
-	return r.put(ctx, item{PartitionKey: orgPK(x.OrganizationID), SortKey: "TEMPLATE#" + x.ID, EntityType: "mass_template", ID: x.ID, OrganizationID: x.OrganizationID}, x)
+	return r.put(ctx, item{PartitionKey: parishPK(x.ParishID), SortKey: "TEMPLATE#" + x.ID, EntityType: "mass_template", ID: x.ID, ParishID: x.ParishID}, x)
 }
 func (r *Repository) UpdateMassTemplate(ctx context.Context, x *internal.MassTemplate) error {
-	return r.updateOrg(ctx, "mass_template", x.ID, x.OrganizationID, x)
+	return r.updateOrg(ctx, "mass_template", x.ID, x.ParishID, x)
 }
 func (r *Repository) DeleteMassTemplate(ctx context.Context, id string) error {
 	return r.deleteID(ctx, "mass_template", id)
@@ -492,10 +523,10 @@ func (r *Repository) CreateSpecialMass(ctx context.Context, x *internal.SpecialM
 	if x.ID == "" {
 		x.ID = newID()
 	}
-	return r.put(ctx, item{PartitionKey: orgPK(x.OrganizationID), SortKey: "SPECIAL#" + x.ServiceDate + "#" + x.ServiceTime + "#" + x.ID, EntityType: "special_mass", ID: x.ID, OrganizationID: x.OrganizationID}, x)
+	return r.put(ctx, item{PartitionKey: parishPK(x.ParishID), SortKey: "SPECIAL#" + x.ServiceDate + "#" + x.ServiceTime + "#" + x.ID, EntityType: "special_mass", ID: x.ID, ParishID: x.ParishID}, x)
 }
 func (r *Repository) UpdateSpecialMass(ctx context.Context, x *internal.SpecialMass) error {
-	return r.updateOrg(ctx, "special_mass", x.ID, x.OrganizationID, x)
+	return r.updateOrg(ctx, "special_mass", x.ID, x.ParishID, x)
 }
 func (r *Repository) DeleteSpecialMass(ctx context.Context, id string) error {
 	return r.deleteID(ctx, "special_mass", id)
@@ -549,7 +580,7 @@ func (r *Repository) ScheduledMasses(ctx context.Context, org, date string) ([]i
 
 func (r *Repository) ListAttendance(ctx context.Context, org, from, to string) ([]internal.Attendance, error) {
 	values := map[string]types.AttributeValue{
-		":pk":     &types.AttributeValueMemberS{Value: orgPK(org)},
+		":pk":     &types.AttributeValueMemberS{Value: parishPK(org)},
 		":prefix": &types.AttributeValueMemberS{Value: "ATTENDANCE#"},
 	}
 	var records []item
@@ -628,7 +659,7 @@ func (r *Repository) AttendanceLedger(ctx context.Context, org, from, to string)
 	return out, nil
 }
 func (r *Repository) UpsertAttendance(ctx context.Context, x *internal.Attendance) error {
-	existing, e := r.ListAttendance(ctx, x.OrganizationID, x.ServiceDate, x.ServiceDate)
+	existing, e := r.ListAttendance(ctx, x.ParishID, x.ServiceDate, x.ServiceDate)
 	if e != nil {
 		return e
 	}
@@ -651,7 +682,7 @@ func (r *Repository) UpdateAttendance(ctx context.Context, x *internal.Attendanc
 	if old.EntityType != "attendance" {
 		return sql.ErrNoRows
 	}
-	x.OrganizationID = old.OrganizationID
+	x.ParishID = old.ParishID
 	if e = r.delete(ctx, old.PartitionKey, old.SortKey); e != nil {
 		return e
 	}
@@ -665,7 +696,7 @@ func attendanceItem(x internal.Attendance) item {
 	if x.SpecialMassID != nil {
 		source = "special"
 	}
-	return item{PartitionKey: orgPK(x.OrganizationID), SortKey: "ATTENDANCE#" + x.ServiceDate + "#" + x.ServiceTime, EntityType: "attendance", ID: x.ID, OrganizationID: x.OrganizationID, MassReportPartitionKey: "ORG#" + x.OrganizationID + "#MASS#" + deref(x.MassNameID) + "#" + source, MassReportSortKey: x.ServiceDate + "#" + x.ServiceTime}
+	return item{PartitionKey: parishPK(x.ParishID), SortKey: "ATTENDANCE#" + x.ServiceDate + "#" + x.ServiceTime, EntityType: "attendance", ID: x.ID, ParishID: x.ParishID, MassReportPartitionKey: "PARISH#" + x.ParishID + "#MASS#" + deref(x.MassNameID) + "#" + source, MassReportSortKey: x.ServiceDate + "#" + x.ServiceTime}
 }
 func (r *Repository) MassAttendanceReport(ctx context.Context, org, from, to, source string) ([]internal.MassAttendanceReport, error) {
 	xs, e := r.ListAttendance(ctx, org, from, to)
@@ -740,14 +771,14 @@ func (r *Repository) updateOrg(ctx context.Context, entity, id, org string, valu
 	if old.EntityType != entity {
 		return sql.ErrNoRows
 	}
-	org = old.OrganizationID
+	org = old.ParishID
 	switch v := value.(type) {
 	case *internal.MassName:
-		v.OrganizationID = org
+		v.ParishID = org
 	case *internal.MassTemplate:
-		v.OrganizationID = org
+		v.ParishID = org
 	case *internal.SpecialMass:
-		v.OrganizationID = org
+		v.ParishID = org
 	}
 	if e = r.delete(ctx, old.PartitionKey, old.SortKey); e != nil {
 		return e
@@ -758,7 +789,7 @@ func (r *Repository) updateOrg(ctx context.Context, entity, id, org string, valu
 		v := value.(*internal.SpecialMass)
 		sk = "SPECIAL#" + v.ServiceDate + "#" + v.ServiceTime + "#" + id
 	}
-	return r.put(ctx, item{PartitionKey: orgPK(org), SortKey: sk, EntityType: entity, ID: id, OrganizationID: org}, value)
+	return r.put(ctx, item{PartitionKey: parishPK(org), SortKey: sk, EntityType: entity, ID: id, ParishID: org}, value)
 }
 func (r *Repository) deleteID(ctx context.Context, entity, id string) error {
 	old, e := r.byID(ctx, id)

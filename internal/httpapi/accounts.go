@@ -13,11 +13,12 @@ type accountInvitation struct {
 	RoleID string `json:"roleId"`
 }
 
-// organizationAccount lets a parish administrator invite a user only into the
-// organization they administer. System roles are deliberately excluded.
-func (a *API) organizationAccount(w http.ResponseWriter, r *http.Request) {
-	organizationID := r.PathValue("id")
-	if !a.requireOrganizationPermission(w, r, organizationID, "manage_users") {
+// parishAccount lets a parish administrator grant a user access only to the
+// parish they administer. New accounts receive a Cognito invitation; an
+// existing Cognito account is linked without sending a duplicate invitation.
+func (a *API) parishAccount(w http.ResponseWriter, r *http.Request) {
+	parishID := r.PathValue("id")
+	if !a.requireParishPermission(w, r, parishID, "manage_users") {
 		return
 	}
 	var request accountInvitation
@@ -31,15 +32,15 @@ func (a *API) organizationAccount(w http.ResponseWriter, r *http.Request) {
 	}
 	role, err := a.repo.GetRole(r.Context(), request.RoleID)
 	if err != nil || role.IsSystem {
-		fail(w, http.StatusBadRequest, errors.New("an organization-scoped role is required"))
+		fail(w, http.StatusBadRequest, errors.New("a parish-scoped role is required"))
 		return
 	}
-	userID, err := a.inviter.Invite(r.Context(), request.Email)
+	userID, err := a.inviter.InviteOrFind(r.Context(), request.Email)
 	if err != nil {
 		fail(w, http.StatusBadGateway, err)
 		return
 	}
-	access := internal.UserAccess{UserID: userID, OrganizationID: &organizationID, RoleID: role.ID, Role: role.Key, RoleName: role.Name}
+	access := internal.UserAccess{UserID: userID, Email: request.Email, ParishID: &parishID, RoleID: role.ID, Role: role.Key, RoleName: role.Name}
 	if err := a.repo.CreateUserAccess(r.Context(), &access); err != nil {
 		fail(w, http.StatusInternalServerError, err)
 		return
