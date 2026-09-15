@@ -164,10 +164,11 @@ export DYNAMODB_ENDPOINT=http://localhost:8000
 
 ## Authentication and first administrator
 
-The application uses a Cognito User Pool with hosted login. Cognito accepts
-only administrator-created accounts and emails each new user a temporary
-password. Deploy the stack, then export its Cognito outputs and choose the
-local callback URL configured in the stack:
+The application uses a Cognito User Pool and accepts only
+administrator-created accounts. Parish administrators can either send the
+standard invitation email with a temporary password, or create an email-sign-in
+account with a password directly and without sending email. Deploy the stack, then export its
+Cognito outputs and choose the local callback URL configured in the stack:
 
 ```sh
 export COGNITO_REGION=us-east-1
@@ -206,9 +207,9 @@ go run ./cmd/attendanceapi
 
 Open `http://localhost:8080/app/`. Sign in with the emailed temporary
 password, create billing accounts and parishes, then parish
-administrators can invite accounts from **User access**. Invited users receive
-their own temporary-password email and can only access their assigned
-parish.
+administrators can add accounts from **User access**. They can send an
+invitation email or create a direct-password account using an email sign-in ID;
+both are limited to their assigned parish role.
 
 ## Attendance workflow
 

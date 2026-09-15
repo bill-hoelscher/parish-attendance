@@ -21,15 +21,24 @@ func (a *API) userAccess(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		for index := range access {
-			if access[index].Email != "" || a.inviter == nil {
-			} else if email, lookupErr := a.inviter.Email(r.Context(), access[index].UserID); lookupErr == nil {
-				access[index].Email = email
-			}
-			if access[index].Email == "" || a.inviter == nil {
+			if a.inviter == nil {
 				access[index].Status = "Unknown"
 				continue
 			}
-			if status, statusErr := a.inviter.Status(r.Context(), access[index].Email); statusErr == nil {
+			if profile, lookupErr := a.inviter.Profile(r.Context(), access[index].UserID); lookupErr == nil {
+				if access[index].Username == "" {
+					access[index].Username = profile.Username
+				}
+				if access[index].Email == "" {
+					access[index].Email = profile.Email
+				}
+			}
+			username := access[index].Username
+			if username == "" {
+				access[index].Status = "Unknown"
+				continue
+			}
+			if status, statusErr := a.inviter.Status(r.Context(), username); statusErr == nil {
 				access[index].Status = status
 			} else {
 				access[index].Status = "Unknown"
@@ -72,15 +81,20 @@ func (a *API) disableUserAccess(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusServiceUnavailable, errors.New("user management is unavailable"))
 		return
 	}
-	email := existing.Email
-	if email == "" {
-		email, err = a.inviter.Email(r.Context(), existing.UserID)
-		if err != nil {
-			fail(w, http.StatusBadGateway, err)
+	username := existing.Username
+	if username == "" {
+		profile, profileErr := a.inviter.Profile(r.Context(), existing.UserID)
+		if profileErr != nil {
+			fail(w, http.StatusBadGateway, profileErr)
 			return
 		}
+		username = profile.Username
 	}
-	if err := a.inviter.Disable(r.Context(), email); err != nil {
+	if username == "" {
+		fail(w, http.StatusBadGateway, errors.New("Cognito user does not have a username"))
+		return
+	}
+	if err := a.inviter.Disable(r.Context(), username); err != nil {
 		fail(w, http.StatusBadGateway, err)
 		return
 	}

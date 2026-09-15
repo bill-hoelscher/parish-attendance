@@ -9,13 +9,16 @@ import (
 )
 
 type accountInvitation struct {
-	Email  string `json:"email"`
-	RoleID string `json:"roleId"`
+	Mode     string `json:"mode"`
+	Email    string `json:"email"`
+	Username string `json:"username"`
+	Password string `json:"password"`
+	RoleID   string `json:"roleId"`
 }
 
-// parishAccount lets a parish administrator grant a user access only to the
-// parish they administer. New accounts receive a Cognito invitation; an
-// existing Cognito account is linked without sending a duplicate invitation.
+// parishAccount lets a parish administrator create an account or grant a user
+// access only to the parish they administer. Email invitations retain the
+// existing Cognito behavior; direct accounts never send email.
 func (a *API) parishAccount(w http.ResponseWriter, r *http.Request) {
 	parishID := r.PathValue("id")
 	if !a.requireParishPermission(w, r, parishID, "manage_users") {
@@ -25,9 +28,11 @@ func (a *API) parishAccount(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &request) {
 		return
 	}
+	request.Mode = strings.TrimSpace(request.Mode)
 	request.Email = strings.TrimSpace(strings.ToLower(request.Email))
-	if request.Email == "" || request.RoleID == "" {
-		fail(w, http.StatusBadRequest, errors.New("email and roleId are required"))
+	request.Username = strings.TrimSpace(request.Username)
+	if request.RoleID == "" {
+		fail(w, http.StatusBadRequest, errors.New("roleId is required"))
 		return
 	}
 	role, err := a.repo.GetRole(r.Context(), request.RoleID)
@@ -35,15 +40,39 @@ func (a *API) parishAccount(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusBadRequest, errors.New("a parish-scoped role is required"))
 		return
 	}
-	userID, err := a.inviter.InviteOrFind(r.Context(), request.Email)
+	if a.inviter == nil {
+		fail(w, http.StatusServiceUnavailable, errors.New("user management is unavailable"))
+		return
+	}
+	var userID string
+	access := internal.UserAccess{ParishID: &parishID, RoleID: role.ID, Role: role.Key, RoleName: role.Name}
+	switch request.Mode {
+	case "", "invite":
+		if request.Email == "" {
+			fail(w, http.StatusBadRequest, errors.New("email and roleId are required"))
+			return
+		}
+		userID, err = a.inviter.InviteOrFind(r.Context(), request.Email)
+		access.Email = request.Email
+	case "password":
+		if request.Email == "" || request.Password == "" {
+			fail(w, http.StatusBadRequest, errors.New("email, password, and roleId are required"))
+			return
+		}
+		userID, err = a.inviter.CreateWithPassword(r.Context(), request.Email, request.Password)
+		access.Email = request.Email
+	default:
+		fail(w, http.StatusBadRequest, errors.New("account mode must be invite or password"))
+		return
+	}
 	if err != nil {
 		fail(w, http.StatusBadGateway, err)
 		return
 	}
-	access := internal.UserAccess{UserID: userID, Email: request.Email, ParishID: &parishID, RoleID: role.ID, Role: role.Key, RoleName: role.Name}
+	access.UserID = userID
 	if err := a.repo.CreateUserAccess(r.Context(), &access); err != nil {
 		fail(w, http.StatusInternalServerError, err)
 		return
 	}
-	respond(w, http.StatusCreated, map[string]string{"userId": userID, "email": request.Email})
+	respond(w, http.StatusCreated, map[string]string{"userId": userID, "username": access.Username, "email": access.Email})
 }

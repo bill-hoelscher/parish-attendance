@@ -140,6 +140,11 @@ type Inviter struct {
 	userPoolID string
 }
 
+type UserProfile struct {
+	Username string
+	Email    string
+}
+
 // Authenticator performs the user-facing Cognito password flows. It deliberately
 // has no persistence: passwords and temporary Cognito sessions only live for the
 // duration of the HTTPS request/response exchange.
@@ -215,6 +220,37 @@ func (i *Inviter) Invite(ctx context.Context, email string) (string, error) {
 	return "", errors.New("Cognito did not return a user subject")
 }
 
+// CreateWithPassword creates an email-sign-in account without sending an
+// invitation, then makes the administrator-supplied password immediately usable.
+func (i *Inviter) CreateWithPassword(ctx context.Context, email, password string) (string, error) {
+	out, err := i.client.AdminCreateUser(ctx, &cognitoidentityprovider.AdminCreateUserInput{
+		UserPoolId:    aws.String(i.userPoolID),
+		Username:      aws.String(email),
+		MessageAction: types.MessageActionTypeSuppress,
+		UserAttributes: []types.AttributeType{
+			{Name: aws.String("email"), Value: aws.String(email)},
+			{Name: aws.String("email_verified"), Value: aws.String("true")},
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+	if _, err := i.client.AdminSetUserPassword(ctx, &cognitoidentityprovider.AdminSetUserPasswordInput{
+		UserPoolId: aws.String(i.userPoolID),
+		Username:   aws.String(email),
+		Password:   aws.String(password),
+		Permanent:  true,
+	}); err != nil {
+		return "", err
+	}
+	for _, attribute := range out.User.Attributes {
+		if aws.ToString(attribute.Name) == "sub" {
+			return aws.ToString(attribute.Value), nil
+		}
+	}
+	return "", errors.New("Cognito did not return a user subject")
+}
+
 // InviteOrFind creates an account when it is new, or returns the Cognito
 // subject for an existing account. Bootstrap uses this so recreating an empty
 // application database does not require deleting the administrator in Cognito.
@@ -245,31 +281,43 @@ func (i *Inviter) InviteOrFind(ctx context.Context, email string) (string, error
 // Email returns the email address for a stored Cognito subject. User access
 // records retain the subject for authorization, but administrators should not
 // need to see it in the application.
-func (i *Inviter) Email(ctx context.Context, userID string) (string, error) {
+func (i *Inviter) Profile(ctx context.Context, userID string) (UserProfile, error) {
 	out, err := i.client.ListUsers(ctx, &cognitoidentityprovider.ListUsersInput{
 		UserPoolId: aws.String(i.userPoolID),
 		Filter:     aws.String(fmt.Sprintf(`sub = "%s"`, userID)),
 		Limit:      aws.Int32(1),
 	})
 	if err != nil {
-		return "", err
+		return UserProfile{}, err
 	}
 	if len(out.Users) == 0 {
-		return "", errors.New("Cognito user not found")
+		return UserProfile{}, errors.New("Cognito user not found")
 	}
+	profile := UserProfile{Username: aws.ToString(out.Users[0].Username)}
 	for _, attribute := range out.Users[0].Attributes {
 		if aws.ToString(attribute.Name) == "email" {
-			return aws.ToString(attribute.Value), nil
+			profile.Email = aws.ToString(attribute.Value)
 		}
 	}
-	return "", errors.New("Cognito user does not have an email address")
+	return profile, nil
+}
+
+func (i *Inviter) Email(ctx context.Context, userID string) (string, error) {
+	profile, err := i.Profile(ctx, userID)
+	if err != nil {
+		return "", err
+	}
+	if profile.Email == "" {
+		return "", errors.New("Cognito user does not have an email address")
+	}
+	return profile.Email, nil
 }
 
 // Status reports whether a Cognito user is currently able to sign in.
-func (i *Inviter) Status(ctx context.Context, email string) (string, error) {
+func (i *Inviter) Status(ctx context.Context, username string) (string, error) {
 	out, err := i.client.AdminGetUser(ctx, &cognitoidentityprovider.AdminGetUserInput{
 		UserPoolId: aws.String(i.userPoolID),
-		Username:   aws.String(email),
+		Username:   aws.String(username),
 	})
 	if err != nil {
 		return "", err
@@ -282,10 +330,10 @@ func (i *Inviter) Status(ctx context.Context, email string) (string, error) {
 
 // Disable prevents a user from signing in. Their access assignment and
 // attendance history stay intact so an administrator can retain the record.
-func (i *Inviter) Disable(ctx context.Context, email string) error {
+func (i *Inviter) Disable(ctx context.Context, username string) error {
 	_, err := i.client.AdminDisableUser(ctx, &cognitoidentityprovider.AdminDisableUserInput{
 		UserPoolId: aws.String(i.userPoolID),
-		Username:   aws.String(email),
+		Username:   aws.String(username),
 	})
 	return err
 }

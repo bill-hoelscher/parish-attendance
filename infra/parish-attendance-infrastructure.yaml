@@ -34,7 +34,7 @@ Resources:
           EmailMessage: Your username is {username} and temporary password is {####}.
       Policies:
         PasswordPolicy:
-          MinimumLength: 12
+          MinimumLength: 8
           RequireLowercase: true
           RequireUppercase: true
           RequireNumbers: true

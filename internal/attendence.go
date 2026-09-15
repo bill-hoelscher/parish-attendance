@@ -74,6 +74,7 @@ type Role struct {
 type UserAccess struct {
 	ID       string  `json:"id"`
 	UserID   string  `json:"userId"`
+	Username string  `json:"username,omitempty"`
 	Email    string  `json:"email,omitempty"`
 	Status   string  `json:"status,omitempty"`
 	ParishID *string `json:"parishId,omitempty"`

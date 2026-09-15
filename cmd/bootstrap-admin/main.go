@@ -25,11 +25,11 @@ var builtInRoles = []internal.Role{
 		Permissions: []string{"manage_users", "manage_schedules", "record_attendance", "view_reports"},
 	},
 	{
-		ID: "role-attendance-counter", Key: "attendance_counter", Name: "Attendance Counter", Scope: "parish",
+		ID: "role-attendance-counter", Key: "attendance_counter", Name: "Attendance Recorder", Scope: "parish",
 		Permissions: []string{"record_attendance", "view_reports"},
 	},
 	{
-		ID: "role-viewer", Key: "viewer", Name: "Viewer", Scope: "parish",
+		ID: "role-viewer", Key: "viewer", Name: "Attendance Viewer", Scope: "parish",
 		Permissions: []string{"view_reports"},
 	},
 }
@@ -83,12 +83,21 @@ func seedRoles(ctx context.Context, repo internal.Repository) error {
 	if err != nil {
 		return err
 	}
-	known := make(map[string]bool, len(existing))
+	known := make(map[string]internal.Role, len(existing))
 	for _, role := range existing {
-		known[role.ID] = true
+		known[role.ID] = role
 	}
 	for _, role := range builtInRoles {
-		if known[role.ID] {
+		current, exists := known[role.ID]
+		if exists {
+			// Upgrade only the former built-in display names. This preserves any
+			// administrator-created names and all existing permissions.
+			if (role.ID == "role-attendance-counter" && current.Name == "Attendance Counter") || (role.ID == "role-viewer" && current.Name == "Viewer") {
+				current.Name = role.Name
+				if err := repo.UpdateRole(ctx, &current); err != nil {
+					return err
+				}
+			}
 			continue
 		}
 		if err := repo.CreateRole(ctx, &role); err != nil {
