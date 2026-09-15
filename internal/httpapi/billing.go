@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"database/sql"
 	"errors"
 	"net/http"
 	"strings"
@@ -15,6 +16,17 @@ func (a *API) billingAccounts(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			fail(w, http.StatusInternalServerError, err)
 			return
+		}
+		for i := range accounts {
+			subscription, err := a.repo.GetSubscription(r.Context(), accounts[i].ID)
+			if errors.Is(err, sql.ErrNoRows) {
+				continue
+			}
+			if err != nil {
+				fail(w, http.StatusInternalServerError, err)
+				return
+			}
+			accounts[i].SubscriptionStatus = subscription.Status
 		}
 		respond(w, http.StatusOK, accounts)
 		return

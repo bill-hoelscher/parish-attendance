@@ -66,6 +66,7 @@ func New(repo internal.Repository, verifier *auth.Verifier, inviter *auth.Invite
 	m.HandleFunc("DELETE /attendance/{id}", a.attendanceItem)
 	m.HandleFunc("GET /parishes/{id}/reports/mass-attendance", a.massReport)
 	m.HandleFunc("GET /parishes/{id}/reports/mass-attendance/{massNameID}", a.massReportEntries)
+	m.HandleFunc("GET /parishes/{id}/reports/weekend-totals", a.weekendTotalsReport)
 	return withCORS(a.requireAuthentication(m))
 }
 

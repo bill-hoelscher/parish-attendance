@@ -39,3 +39,16 @@ func (a *API) massReportEntries(w http.ResponseWriter, r *http.Request) {
 	}
 	respond(w, 200, x)
 }
+
+func (a *API) weekendTotalsReport(w http.ResponseWriter, r *http.Request) {
+	parishID := r.PathValue("id")
+	if !a.requireParishPermission(w, r, parishID, "view_reports") {
+		return
+	}
+	totals, err := a.repo.WeekendAttendanceTotals(r.Context(), parishID, r.URL.Query().Get("from"), r.URL.Query().Get("to"))
+	if err != nil {
+		fail(w, http.StatusInternalServerError, err)
+		return
+	}
+	respond(w, http.StatusOK, totals)
+}

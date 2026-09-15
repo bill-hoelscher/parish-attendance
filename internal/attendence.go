@@ -25,17 +25,25 @@ type Parish struct {
 // Diocese is the parent grouping for parishes. Billing remains associated
 // directly with parishes, not dioceses.
 type Diocese struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID            string `json:"id"`
+	Name          string `json:"name"`
+	StreetAddress string `json:"streetAddress"`
+	City          string `json:"city"`
+	StateProvince string `json:"stateProvince"`
+	PostalCode    string `json:"postalCode"`
+	ContactName   string `json:"contactName"`
+	ContactEmail  string `json:"contactEmail"`
+	ContactPhone  string `json:"contactPhone"`
 }
 
 // BillingAccount owns a Stripe-ready subscription and may cover one or more
 // parishes. No Stripe API calls are made by this application yet.
 type BillingAccount struct {
-	ID           string `json:"id"`
-	Name         string `json:"name"`
-	BillingEmail string `json:"billingEmail"`
-	ParishCount  int    `json:"parishCount"`
+	ID                 string `json:"id"`
+	Name               string `json:"name"`
+	BillingEmail       string `json:"billingEmail"`
+	ParishCount        int    `json:"parishCount"`
+	SubscriptionStatus string `json:"subscriptionStatus,omitempty"`
 }
 
 // Subscription is the application's internal subscription record. Stripe IDs
@@ -144,6 +152,14 @@ type MassAttendanceEntry struct {
 	AttendanceCount int    `json:"attendanceCount"`
 }
 
+// WeekendAttendanceTotal is the combined recorded attendance for the
+// Saturday and Sunday services in one calendar weekend.
+type WeekendAttendanceTotal struct {
+	WeekendStart    string `json:"weekendStart"`
+	WeekendEnd      string `json:"weekendEnd"`
+	AttendanceTotal int    `json:"attendanceTotal"`
+}
+
 type ScheduledMass struct {
 	MassNameID     *string `json:"massNameId,omitempty"`
 	MassTemplateID *string `json:"massTemplateId,omitempty"`
@@ -219,6 +235,7 @@ type Repository interface {
 	DeleteAttendance(ctx context.Context, id string) error
 	MassAttendanceReport(ctx context.Context, parishID, from, to, source string) ([]MassAttendanceReport, error)
 	MassAttendanceEntries(ctx context.Context, parishID, massNameID, from, to, source string) ([]MassAttendanceEntry, error)
+	WeekendAttendanceTotals(ctx context.Context, parishID, from, to string) ([]WeekendAttendanceTotal, error)
 }
 
 type Services struct {

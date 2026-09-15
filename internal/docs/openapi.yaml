@@ -162,6 +162,14 @@ paths:
         - { in: query, name: to, required: true, schema: { type: string, format: date } }
         - { in: query, name: type, required: false, schema: { type: string, enum: [recurring, weekend, weekday, special] } }
       responses: { '200': { description: Report returned } }
+  /parishes/{id}/reports/weekend-totals:
+    get:
+      summary: Get recorded recurring Saturday and Sunday attendance totals by calendar weekend
+      parameters:
+        - { $ref: '#/components/parameters/parishId' }
+        - { in: query, name: from, required: true, schema: { type: string, format: date } }
+        - { in: query, name: to, required: true, schema: { type: string, format: date } }
+      responses: { '200': { description: Weekend totals returned } }
   /parishes/{id}/reports/mass-attendance/{massNameID}:
     get:
       summary: List every attendance entry for one Mass name and report type

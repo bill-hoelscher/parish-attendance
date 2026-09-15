@@ -755,6 +755,41 @@ func (r *Repository) MassAttendanceEntries(ctx context.Context, org, mass, from,
 	return out, nil
 }
 
+func (r *Repository) WeekendAttendanceTotals(ctx context.Context, parishID, from, to string) ([]internal.WeekendAttendanceTotal, error) {
+	attendance, err := r.ListAttendance(ctx, parishID, from, to)
+	if err != nil {
+		return nil, err
+	}
+	totals := map[string]*internal.WeekendAttendanceTotal{}
+	for _, record := range attendance {
+		if record.SpecialMassID != nil {
+			continue
+		}
+		serviceDate, err := time.Parse("2006-01-02", record.ServiceDate)
+		if err != nil || (serviceDate.Weekday() != time.Saturday && serviceDate.Weekday() != time.Sunday) {
+			continue
+		}
+		weekendStart := serviceDate
+		if serviceDate.Weekday() == time.Sunday {
+			weekendStart = weekendStart.AddDate(0, 0, -1)
+		}
+		key := weekendStart.Format("2006-01-02")
+		if totals[key] == nil {
+			totals[key] = &internal.WeekendAttendanceTotal{
+				WeekendStart: key,
+				WeekendEnd:   weekendStart.AddDate(0, 0, 1).Format("2006-01-02"),
+			}
+		}
+		totals[key].AttendanceTotal += record.AttendanceCount
+	}
+	result := make([]internal.WeekendAttendanceTotal, 0, len(totals))
+	for _, total := range totals {
+		result = append(result, *total)
+	}
+	sort.Slice(result, func(i, j int) bool { return result[i].WeekendStart < result[j].WeekendStart })
+	return result, nil
+}
+
 func reportAttendanceMatchesSource(x internal.Attendance, source string) bool {
 	if source == "" {
 		return true
